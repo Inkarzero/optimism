@@ -27,7 +27,8 @@ var (
 var (
 	ConfigUpdateEventABI      = "ConfigUpdate(uint256,uint8,bytes)"
 	ConfigUpdateEventABIHash  = crypto.Keccak256Hash([]byte(ConfigUpdateEventABI))
-	ConfigUpdateEventVersion0 = common.Hash{}
+	ConfigUpdateEventVersion0 = uint64(0)
+	ConfigUpdateEventVersion1 = uint64(1)
 )
 
 // UpdateSystemConfigWithL1Receipts filters all L1 receipts to find config updates and applies the config updates to the given sysCfg
@@ -53,7 +54,7 @@ func UpdateSystemConfigWithL1Receipts(sysCfg *eth.SystemConfig, receipts []*type
 // parse log data for:
 //
 //	event ConfigUpdate(
-//	    uint256 indexed version,
+//	    uint256 indexed nonceAndVersion,
 //	    UpdateType indexed updateType,
 //	    bytes data
 //	);
@@ -66,10 +67,14 @@ func ProcessSystemConfigUpdateLogEvent(destSysCfg *eth.SystemConfig, ev *types.L
 	}
 
 	// indexed 0
-	version := ev.Topics[1]
-	if version != ConfigUpdateEventVersion0 {
-		return fmt.Errorf("unrecognized SystemConfig update event version: %s", version)
+	_, version := unpackNonceAndVersion(ev.Topics[1])
+	switch version {
+	case ConfigUpdateEventVersion0:
+	case ConfigUpdateEventVersion1:
+	default:
+		return fmt.Errorf("unrecognized SystemConfig update event version: %d", version)
 	}
+
 	// indexed 1
 	updateType := ev.Topics[2]
 

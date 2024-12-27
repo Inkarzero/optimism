@@ -17,7 +17,8 @@ import (
 var (
 	DepositEventABI      = "TransactionDeposited(address,address,uint256,bytes)"
 	DepositEventABIHash  = crypto.Keccak256Hash([]byte(DepositEventABI))
-	DepositEventVersion0 = common.Hash{}
+	DepositEventVersion0 = uint64(0)
+	DepositEventVersion1 = uint64(1)
 )
 
 // UnmarshalDepositLogEvent decodes an EVM log entry emitted by the deposit contract into typed deposit data.
@@ -27,7 +28,7 @@ var (
 //	event TransactionDeposited(
 //	    address indexed from,
 //	    address indexed to,
-//	    uint256 indexed version,
+//	    uint256 indexed nonceAndVersion,
 //	    bytes opaqueData
 //	);
 //
@@ -51,7 +52,7 @@ func UnmarshalDepositLogEvent(ev *types.Log) (*types.DepositTx, error) {
 	// indexed 1
 	to := common.BytesToAddress(ev.Topics[2][12:])
 	// indexed 2
-	version := ev.Topics[3]
+	nonceAndVersion := ev.Topics[3]
 	// unindexed data
 	// Solidity serializes the event's Data field as follows:
 	// abi.encode(abi.encodPacked(uint256 mint, uint256 value, uint64 gasLimit, uint8 isCreation, bytes data))
@@ -83,17 +84,36 @@ func UnmarshalDepositLogEvent(ev *types.Log) (*types.DepositTx, error) {
 	dep.From = from
 	dep.IsSystemTransaction = false
 
+	_, version := unpackNonceAndVersion(nonceAndVersion)
+
 	var err error
 	switch version {
 	case DepositEventVersion0:
 		err = unmarshalDepositVersion0(&dep, to, opaqueData)
+	case DepositEventVersion1:
+		err = unmarshalDepositVersion1(&dep, to, opaqueData)
 	default:
-		return nil, fmt.Errorf("invalid deposit version, got %s", version)
+		return nil, fmt.Errorf("invalid deposit version, got %d", version)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode deposit (version %s): %w", version, err)
+		return nil, fmt.Errorf("failed to decode deposit (version %d): %w", version, err)
 	}
 	return &dep, nil
+}
+
+func unpackNonceAndVersion(nonceAndVersion common.Hash) (nonce uint64, version uint64) {
+	i := new(big.Int).SetBytes(nonceAndVersion[:])
+	mask64 := new(big.Int).SetBytes(common.Hex2Bytes("ffffffffffffffff"))
+	version = mask64.And(mask64, i).Uint64()
+	nonce = i.Lsh(i, 128).Uint64()
+	return
+}
+
+func packNonceAndVersion(nonce uint64, version uint64) common.Hash {
+	i := new(big.Int).SetUint64(nonce)
+	i.Rsh(i, 128)
+	i.Or(i, new(big.Int).SetUint64(version))
+	return common.BytesToHash(i.Bytes())
 }
 
 func unmarshalDepositVersion0(dep *types.DepositTx, to common.Address, opaqueData []byte) error {
@@ -140,6 +160,11 @@ func unmarshalDepositVersion0(dep *types.DepositTx, to common.Address, opaqueDat
 	return nil
 }
 
+func unmarshalDepositVersion1(dep *types.DepositTx, to common.Address, opaqueData []byte) error {
+	// version 1 simply adds a nonce; the rest is the same
+	return unmarshalDepositVersion0(dep, to, opaqueData)
+}
+
 // MarshalDepositLogEvent returns an EVM log entry that encodes a TransactionDeposited event from the deposit contract.
 // This is the reverse of the deposit transaction derivation.
 func MarshalDepositLogEvent(depositContractAddr common.Address, deposit *types.DepositTx) (*types.Log, error) {
@@ -151,7 +176,7 @@ func MarshalDepositLogEvent(depositContractAddr common.Address, deposit *types.D
 		DepositEventABIHash,
 		eth.AddressAsLeftPaddedHash(deposit.From),
 		toBytes,
-		DepositEventVersion0,
+		packNonceAndVersion(0, DepositEventVersion0),
 	}
 
 	data := make([]byte, 64, 64+3*32)

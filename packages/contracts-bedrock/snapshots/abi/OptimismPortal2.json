@@ -671,6 +671,19 @@
   },
   {
     "inputs": [],
+    "name": "transactionDepositedNonce",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "version",
     "outputs": [
       {
@@ -745,7 +758,7 @@
       {
         "indexed": true,
         "internalType": "uint256",
-        "name": "version",
+        "name": "nonceAndVersion",
         "type": "uint256"
       },
       {

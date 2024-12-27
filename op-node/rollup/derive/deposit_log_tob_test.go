@@ -188,13 +188,13 @@ func FuzzDeriveDepositsBadVersion(f *testing.F) {
 						// Generate any topic but the deposit event versions we support.
 						// TODO: As opposed to keeping this hardcoded, a method such as IsValidVersion(v) should be
 						//  used here.
-						badTopic := DepositEventVersion0
-						for badTopic == DepositEventVersion0 {
-							typeProvider.Fuzz(&badTopic)
+						badVersion := DepositEventVersion0
+						for badVersion == DepositEventVersion0 {
+							typeProvider.Fuzz(&badVersion)
 						}
 
 						// Set our bad topic and update our state
-						log.Topics[3] = badTopic
+						log.Topics[3] = packNonceAndVersion(0, badVersion)
 						hasBadDepositVersion = true
 					}
 				}

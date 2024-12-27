@@ -168,7 +168,7 @@ contract CommonTest is Test, Setup, Events {
     )
         internal
     {
-        emit TransactionDeposited(_from, _to, 0, abi.encodePacked(_mint, _value, _gasLimit, _isCreation, _data));
+        emit TransactionDeposited(_from, _to, 1, abi.encodePacked(_mint, _value, _gasLimit, _isCreation, _data));
     }
 
     function enableLegacyContracts() public {
