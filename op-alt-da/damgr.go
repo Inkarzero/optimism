@@ -166,7 +166,7 @@ func (d *DA) Finalize(l1Finalized eth.L1BlockRef) {
 // It is used when the derivation pipeline stalls due to missing data and we need to continue
 // syncing challenge events until the challenge is resolved or expires.
 func (d *DA) LookAhead(ctx context.Context, l1 L1Fetcher) error {
-	d.log.Info("looking ahead for challenges", "origin", d.challengeOrigin)
+	d.log.Debug("optimism/op-alt-da/damgr.go\t", "LookAhead\t", "origin\t", d.challengeOrigin)
 	blkRef, err := l1.L1BlockRefByNumber(ctx, d.challengeOrigin.Number+1)
 	// temporary error, will do a backoff
 	if err != nil {
