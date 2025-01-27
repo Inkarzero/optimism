@@ -84,7 +84,6 @@ func NewAltDA(log log.Logger, cli CLIConfig, cfg Config, metrics Metricer) *DA {
 
 // NewAltDAWithStorage creates a new AltDA instance with the given log and DAStorage interface.
 func NewAltDAWithStorage(log log.Logger, cfg Config, storage DAStorage, metrics Metricer) *DA {
-<<<<<<< HEAD
 	log.Debug("optimism/op-alt-da/damgr.go\t", "NewAltDAWithStorage\t", "altda created")
 =======
 	log.Debug("optimism/op-alt-da/damgr.go", "NewAltDAWithStorage", "altda created")
