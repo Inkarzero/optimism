@@ -67,6 +67,10 @@ func (c *CheatCodesPrecompile) Load(account common.Address, slot [32]byte) [32]b
 // Etch implements https://book.getfoundry.sh/cheatcodes/etch
 func (c *CheatCodesPrecompile) Etch(who common.Address, code []byte) {
 	c.h.state.SetCode(who, bytes.Clone(code)) // important to clone; geth EVM will reuse the calldata memory.
+	if len(code) > 0 {
+		// if we're not just zeroing out the account: allow it to access cheatcodes
+		c.h.AllowCheatcodes(who)
+	}
 }
 
 // Deal implements https://book.getfoundry.sh/cheatcodes/deal
@@ -183,31 +187,26 @@ func (c *CheatCodesPrecompile) Coinbase(addr common.Address) {
 
 // Broadcast_afc98040 implements https://book.getfoundry.sh/cheatcodes/broadcast
 func (c *CheatCodesPrecompile) Broadcast_afc98040() error {
-	c.h.log.Info("broadcasting next call")
 	return c.h.Prank(nil, nil, false, true)
 }
 
 // Broadcast_e6962cdb implements https://book.getfoundry.sh/cheatcodes/broadcast
 func (c *CheatCodesPrecompile) Broadcast_e6962cdb(who common.Address) error {
-	c.h.log.Info("broadcasting next call", "who", who)
 	return c.h.Prank(&who, nil, false, true)
 }
 
 // StartBroadcast_7fb5297f implements https://book.getfoundry.sh/cheatcodes/start-broadcast
 func (c *CheatCodesPrecompile) StartBroadcast_7fb5297f() error {
-	c.h.log.Info("starting repeat-broadcast")
 	return c.h.Prank(nil, nil, true, true)
 }
 
 // StartBroadcast_7fec2a8d implements https://book.getfoundry.sh/cheatcodes/start-broadcast
 func (c *CheatCodesPrecompile) StartBroadcast_7fec2a8d(who common.Address) error {
-	c.h.log.Info("starting repeat-broadcast", "who", who)
 	return c.h.Prank(&who, nil, true, true)
 }
 
 // StopBroadcast implements https://book.getfoundry.sh/cheatcodes/stop-broadcast
 func (c *CheatCodesPrecompile) StopBroadcast() error {
-	c.h.log.Info("stopping repeat-broadcast")
 	return c.h.StopPrank(true)
 }
 

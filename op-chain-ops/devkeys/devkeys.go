@@ -49,29 +49,63 @@ func ChainUserKeys(chainID *big.Int) func(index uint64) ChainUserKey {
 	}
 }
 
+type Role interface {
+	Key(chainID *big.Int) Key
+}
+
 // SuperchainOperatorRole identifies an account used in the operations of superchain contracts
 type SuperchainOperatorRole uint64
 
 const (
 	// SuperchainDeployerKey is the deployer of the superchain contracts.
 	SuperchainDeployerKey SuperchainOperatorRole = 0
+	// SuperchainProxyAdminOwner is the key that owns the superchain ProxyAdmin
+	SuperchainProxyAdminOwner SuperchainOperatorRole = 1
 	// SuperchainConfigGuardianKey is the Guardian of the SuperchainConfig.
-	SuperchainConfigGuardianKey SuperchainOperatorRole = 1
+	SuperchainConfigGuardianKey SuperchainOperatorRole = 2
+	// SuperchainProtocolVersionsOwner is the key that can make ProtocolVersions changes.
+	SuperchainProtocolVersionsOwner SuperchainOperatorRole = 3
 	// DependencySetManagerKey is the key used to manage the dependency set of a superchain.
-	DependencySetManagerKey SuperchainOperatorRole = 2
+	DependencySetManagerKey SuperchainOperatorRole = 4
 )
 
 func (role SuperchainOperatorRole) String() string {
 	switch role {
 	case SuperchainDeployerKey:
 		return "superchain-deployer"
+	case SuperchainProxyAdminOwner:
+		return "superchain-proxy-admin-owner"
 	case SuperchainConfigGuardianKey:
 		return "superchain-config-guardian"
+	case SuperchainProtocolVersionsOwner:
+		return "superchain-protocol-versions-owner"
 	case DependencySetManagerKey:
 		return "dependency-set-manager"
 	default:
 		return fmt.Sprintf("unknown-superchain-%d", uint64(role))
 	}
+}
+
+func (role SuperchainOperatorRole) Key(chainID *big.Int) Key {
+	return &SuperchainOperatorKey{
+		ChainID: chainID,
+		Role:    role,
+	}
+}
+
+func (role *SuperchainOperatorRole) UnmarshalText(data []byte) error {
+	v := string(data)
+	for i := SuperchainOperatorRole(0); i < 20; i++ {
+		if i.String() == v {
+			*role = i
+			return nil
+		}
+	}
+	return fmt.Errorf("unknown superchain operator role %q", v)
+}
+
+func (role *SuperchainOperatorRole) MarshalText() ([]byte, error) {
+	return []byte(role.String()), nil
 }
 
 // SuperchainOperatorKey is an account specific to an OperationRole of a given OP-Stack chain.
@@ -122,6 +156,8 @@ const (
 	L1FeeVaultRecipientRole ChainOperatorRole = 8
 	// SequencerFeeVaultRecipientRole is the key that receives form the SequencerFeeVault predeploy
 	SequencerFeeVaultRecipientRole ChainOperatorRole = 9
+	// SystemConfigOwner is the key that can make SystemConfig changes.
+	SystemConfigOwner ChainOperatorRole = 10
 )
 
 func (role ChainOperatorRole) String() string {
@@ -146,16 +182,33 @@ func (role ChainOperatorRole) String() string {
 		return "l1-fee-vault-recipient"
 	case SequencerFeeVaultRecipientRole:
 		return "sequencer-fee-vault-recipient"
+	case SystemConfigOwner:
+		return "system-config-owner"
 	default:
 		return fmt.Sprintf("unknown-operator-%d", uint64(role))
 	}
 }
 
-func (role ChainOperatorRole) Key(chainID *big.Int) *ChainOperatorKey {
+func (role ChainOperatorRole) Key(chainID *big.Int) Key {
 	return &ChainOperatorKey{
 		ChainID: chainID,
 		Role:    role,
 	}
+}
+
+func (role *ChainOperatorRole) UnmarshalText(data []byte) error {
+	v := string(data)
+	for i := ChainOperatorRole(0); i < 20; i++ {
+		if i.String() == v {
+			*role = i
+			return nil
+		}
+	}
+	return fmt.Errorf("unknown chain operator role %q", v)
+}
+
+func (role *ChainOperatorRole) MarshalText() ([]byte, error) {
+	return []byte(role.String()), nil
 }
 
 // ChainOperatorKey is an account specific to an OperationRole of a given OP-Stack chain.

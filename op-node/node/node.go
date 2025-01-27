@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	gosync "sync"
 	"sync/atomic"
 	"time"
 
@@ -12,7 +13,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/event"
+	gethevent "github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
@@ -22,6 +23,9 @@ import (
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/conductor"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/driver"
+	"github.com/ethereum-optimism/optimism/op-node/rollup/event"
+	"github.com/ethereum-optimism/optimism/op-node/rollup/interop"
+	"github.com/ethereum-optimism/optimism/op-node/rollup/sequencing"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/sync"
 	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
@@ -40,6 +44,8 @@ type closableSafeDB interface {
 }
 
 type OpNode struct {
+	// Retain the config to test for active features rather than test for runtime state.
+	cfg        *Config
 	log        log.Logger
 	appVersion string
 	metrics    *metrics.Metrics
@@ -48,11 +54,15 @@ type OpNode struct {
 	l1SafeSub      ethereum.Subscription // Subscription to get L1 safe blocks, a.k.a. justified data (polling)
 	l1FinalizedSub ethereum.Subscription // Subscription to get L1 safe blocks, a.k.a. justified data (polling)
 
+	eventSys   event.System
+	eventDrain event.Drainer
+
 	l1Source  *sources.L1Client     // L1 Client to fetch data from
 	l2Driver  *driver.Driver        // L2 Engine to Sync
 	l2Source  *sources.EngineClient // L2 Execution Engine RPC bindings
 	server    *rpcServer            // RPC server hosting the rollup-node API
 	p2pNode   *p2p.NodeP2P          // P2P node functionality
+	p2pMu     gosync.Mutex          // protects p2pNode
 	p2pSigner p2p.Signer            // p2p gossip application messages will be signed with this signer
 	tracer    Tracer                // tracer to get events for testing/debugging
 	runCfg    *RuntimeConfig        // runtime configurables
@@ -65,6 +75,9 @@ type OpNode struct {
 	metricsSrv   *httputil.HTTPServer
 
 	beacon *sources.L1BeaconClient
+
+	supervisor       *sources.SupervisorClient
+	tmpInteropServer *interop.TemporaryInteropServer
 
 	// some resources cannot be stopped directly, like the p2p gossipsub router (not our design),
 	// and depend on this ctx to be closed.
@@ -93,6 +106,7 @@ func New(ctx context.Context, cfg *Config, log log.Logger, appVersion string, m 
 	}
 
 	n := &OpNode{
+		cfg:        cfg,
 		log:        log,
 		appVersion: appVersion,
 		metrics:    m,
@@ -119,6 +133,7 @@ func (n *OpNode) init(ctx context.Context, cfg *Config) error {
 	if err := n.initTracer(ctx, cfg); err != nil {
 		return fmt.Errorf("failed to init the trace: %w", err)
 	}
+	n.initEventSystem()
 	if err := n.initL1(ctx, cfg); err != nil {
 		return fmt.Errorf("failed to init L1: %w", err)
 	}
@@ -134,7 +149,7 @@ func (n *OpNode) init(ctx context.Context, cfg *Config) error {
 	if err := n.initP2PSigner(ctx, cfg); err != nil {
 		return fmt.Errorf("failed to init the P2P signer: %w", err)
 	}
-	if err := n.initP2P(ctx, cfg); err != nil {
+	if err := n.initP2P(cfg); err != nil {
 		return fmt.Errorf("failed to init the P2P stack: %w", err)
 	}
 	// Only expose the server at the end, ensuring all RPC backend components are initialized.
@@ -152,6 +167,16 @@ func (n *OpNode) init(ctx context.Context, cfg *Config) error {
 	return nil
 }
 
+func (n *OpNode) initEventSystem() {
+	// This executor will be configurable in the future, for parallel event processing
+	executor := event.NewGlobalSynchronous(n.resourcesCtx)
+	sys := event.NewSystem(n.log, executor)
+	sys.AddTracer(event.NewMetricsTracer(n.metrics))
+	sys.Register("node", event.DeriverFunc(n.onEvent), event.DefaultRegisterOpts())
+	n.eventSys = sys
+	n.eventDrain = executor
+}
+
 func (n *OpNode) initTracer(ctx context.Context, cfg *Config) error {
 	if cfg.Tracer != nil {
 		n.tracer = cfg.Tracer
@@ -167,9 +192,6 @@ func (n *OpNode) initL1(ctx context.Context, cfg *Config) error {
 		return fmt.Errorf("failed to get L1 RPC client: %w", err)
 	}
 
-	// Set the RethDB path in the EthClientConfig, if there is one configured.
-	rpcCfg.EthClientConfig.RethDBPath = cfg.RethDBPath
-
 	n.l1Source, err = sources.NewL1Client(
 		client.NewInstrumentedRPC(l1Node, &n.metrics.RPCMetrics.RPCClientMetrics), n.log, n.metrics.L1SourceCache, rpcCfg)
 	if err != nil {
@@ -181,7 +203,7 @@ func (n *OpNode) initL1(ctx context.Context, cfg *Config) error {
 	}
 
 	// Keep subscribed to the L1 heads, which keeps the L1 maintainer pointing to the best headers to sync
-	n.l1HeadsSub = event.ResubscribeErr(time.Second*10, func(ctx context.Context, err error) (event.Subscription, error) {
+	n.l1HeadsSub = gethevent.ResubscribeErr(time.Second*10, func(ctx context.Context, err error) (gethevent.Subscription, error) {
 		if err != nil {
 			n.log.Warn("resubscribing after failed L1 subscription", "err", err)
 		}
@@ -244,12 +266,12 @@ func (n *OpNode) initRuntimeConfig(ctx context.Context, cfg *Config) error {
 	}
 
 	// initialize the runtime config before unblocking
-	if _, err := retry.Do(ctx, 5, retry.Fixed(time.Second*10), func() (eth.L1BlockRef, error) {
-		ref, err := reload(ctx)
+	if err := retry.Do0(ctx, 5, retry.Fixed(time.Second*10), func() error {
+		_, err := reload(ctx)
 		if errors.Is(err, errNodeHalt) { // don't retry on halt error
 			err = nil
 		}
-		return ref, err
+		return err
 	}); err != nil {
 		return fmt.Errorf("failed to load runtime configuration repeatedly, last error: %w", err)
 	}
@@ -377,6 +399,15 @@ func (n *OpNode) initL2(ctx context.Context, cfg *Config) error {
 		return err
 	}
 
+	if cfg.Rollup.InteropTime != nil {
+		cl, srv, err := cfg.InteropConfig.TemporarySetup(ctx, n.log, n.l2Source)
+		if err != nil {
+			return fmt.Errorf("failed to setup interop: %w", err)
+		}
+		n.supervisor = cl
+		n.tmpInteropServer = srv
+	}
+
 	var sequencerConductor conductor.SequencerConductor = &conductor.NoOpConductor{}
 	if cfg.ConductorEnabled {
 		sequencerConductor = NewConductorClient(cfg, n.log, n.metrics)
@@ -408,8 +439,9 @@ func (n *OpNode) initRPCServer(cfg *Config) error {
 	if err != nil {
 		return err
 	}
-	if n.p2pNode != nil {
-		server.EnableP2P(p2p.NewP2PAPIBackend(n.p2pNode, n.log, n.metrics))
+
+	if p2pNode := n.getP2PNodeIfEnabled(); p2pNode != nil {
+		server.EnableP2P(p2p.NewP2PAPIBackend(p2pNode, n.log, n.metrics))
 	}
 	if cfg.RPC.EnableAdmin {
 		server.EnableAdminAPI(NewAdminAPI(n.l2Driver, n.metrics, n.log))
@@ -419,6 +451,7 @@ func (n *OpNode) initRPCServer(cfg *Config) error {
 	if err := server.Start(); err != nil {
 		return fmt.Errorf("unable to start RPC server: %w", err)
 	}
+	n.log.Info("Started JSON-RPC server", "addr", server.Addr())
 	n.server = server
 	return nil
 }
@@ -455,14 +488,22 @@ func (n *OpNode) initPProf(cfg *Config) error {
 	return nil
 }
 
-func (n *OpNode) initP2P(ctx context.Context, cfg *Config) error {
-	if cfg.P2P != nil {
-		// TODO(protocol-quest/97): Use EL Sync instead of CL Alt sync for fetching missing blocks in the payload queue.
-		p2pNode, err := p2p.NewNodeP2P(n.resourcesCtx, &cfg.Rollup, n.log, cfg.P2P, n, n.l2Source, n.runCfg, n.metrics, false)
-		if err != nil || p2pNode == nil {
-			return err
+func (n *OpNode) p2pEnabled() bool {
+	return n.cfg.P2PEnabled()
+}
+
+func (n *OpNode) initP2P(cfg *Config) (err error) {
+	n.p2pMu.Lock()
+	defer n.p2pMu.Unlock()
+	if n.p2pNode != nil {
+		panic("p2p node already initialized")
+	}
+	if n.p2pEnabled() {
+		// TODO(protocol-quest#97): Use EL Sync instead of CL Alt sync for fetching missing blocks in the payload queue.
+		n.p2pNode, err = p2p.NewNodeP2P(n.resourcesCtx, &cfg.Rollup, n.log, cfg.P2P, n, n.l2Source, n.runCfg, n.metrics, false)
+		if err != nil {
+			return
 		}
-		n.p2pNode = p2pNode
 		if n.p2pNode.Dv5Udp() != nil {
 			go n.p2pNode.DiscoveryProcess(n.resourcesCtx, n.log, &cfg.Rollup, cfg.P2P.TargetPeers())
 		}
@@ -470,15 +511,14 @@ func (n *OpNode) initP2P(ctx context.Context, cfg *Config) error {
 	return nil
 }
 
-func (n *OpNode) initP2PSigner(ctx context.Context, cfg *Config) error {
+func (n *OpNode) initP2PSigner(ctx context.Context, cfg *Config) (err error) {
 	// the p2p signer setup is optional
 	if cfg.P2PSigner == nil {
-		return nil
+		return
 	}
 	// p2pSigner may still be nil, the signer setup may not create any signer, the signer is optional
-	var err error
 	n.p2pSigner, err = cfg.P2PSigner.SetupSigner(ctx)
-	return err
+	return
 }
 
 func (n *OpNode) Start(ctx context.Context) error {
@@ -490,6 +530,20 @@ func (n *OpNode) Start(ctx context.Context) error {
 	}
 	log.Info("Rollup node started")
 	return nil
+}
+
+// onEvent handles broadcast events.
+// The OpNode itself is a deriver to catch system-critical events.
+// Other event-handling should be encapsulated into standalone derivers.
+func (n *OpNode) onEvent(ev event.Event) bool {
+	switch x := ev.(type) {
+	case rollup.CriticalErrorEvent:
+		n.log.Error("Critical error", "err", x.Err)
+		n.cancel(fmt.Errorf("critical error: %w", x.Err))
+		return true
+	default:
+		return false
+	}
 }
 
 func (n *OpNode) OnNewL1Head(ctx context.Context, sig eth.L1BlockRef) {
@@ -534,13 +588,13 @@ func (n *OpNode) PublishL2Payload(ctx context.Context, envelope *eth.ExecutionPa
 	n.tracer.OnPublishL2Payload(ctx, envelope)
 
 	// publish to p2p, if we are running p2p at all
-	if n.p2pNode != nil {
+	if p2pNode := n.getP2PNodeIfEnabled(); p2pNode != nil {
 		payload := envelope.ExecutionPayload
 		if n.p2pSigner == nil {
 			return fmt.Errorf("node has no p2p signer, payload %s cannot be published", payload.ID())
 		}
 		n.log.Info("Publishing signed execution payload on p2p", "id", payload.ID())
-		return n.p2pNode.GossipOut().PublishL2Payload(ctx, envelope, n.p2pSigner)
+		return p2pNode.GossipOut().PublishL2Payload(ctx, envelope, n.p2pSigner)
 	}
 	// if p2p is not enabled then we just don't publish the payload
 	return nil
@@ -548,7 +602,7 @@ func (n *OpNode) PublishL2Payload(ctx context.Context, envelope *eth.ExecutionPa
 
 func (n *OpNode) OnUnsafeL2Payload(ctx context.Context, from peer.ID, envelope *eth.ExecutionPayloadEnvelope) error {
 	// ignore if it's from ourselves
-	if n.p2pNode != nil && from == n.p2pNode.Host().ID() {
+	if p2pNode := n.getP2PNodeIfEnabled(); p2pNode != nil && from == p2pNode.Host().ID() {
 		return nil
 	}
 
@@ -569,12 +623,16 @@ func (n *OpNode) OnUnsafeL2Payload(ctx context.Context, from peer.ID, envelope *
 }
 
 func (n *OpNode) RequestL2Range(ctx context.Context, start, end eth.L2BlockRef) error {
-	if n.p2pNode != nil && n.p2pNode.AltSyncEnabled() {
+	if p2pNode := n.getP2PNodeIfEnabled(); p2pNode != nil && p2pNode.AltSyncEnabled() {
 		if unixTimeStale(start.Time, 12*time.Hour) {
-			n.log.Debug("ignoring request to sync L2 range, timestamp is too old for p2p", "start", start, "end", end, "start_time", start.Time)
+			n.log.Debug(
+				"ignoring request to sync L2 range, timestamp is too old for p2p",
+				"start", start,
+				"end", end,
+				"start_time", start.Time)
 			return nil
 		}
-		return n.p2pNode.RequestL2Range(ctx, start, end)
+		return p2pNode.RequestL2Range(ctx, start, end)
 	}
 	n.log.Debug("ignoring request to sync L2 range, no sync method available", "start", start, "end", end)
 	return nil
@@ -586,7 +644,7 @@ func unixTimeStale(timestamp uint64, duration time.Duration) bool {
 }
 
 func (n *OpNode) P2P() p2p.Node {
-	return n.p2pNode
+	return n.getP2PNodeIfEnabled()
 }
 
 func (n *OpNode) RuntimeConfig() ReadonlyRuntimeConfig {
@@ -607,11 +665,31 @@ func (n *OpNode) Stop(ctx context.Context) error {
 			result = multierror.Append(result, fmt.Errorf("failed to close RPC server: %w", err))
 		}
 	}
+
+	// Stop sequencer and report last hash. l2Driver can be nil if we're cleaning up a failed init.
+	if n.l2Driver != nil {
+		latestHead, err := n.l2Driver.StopSequencer(ctx)
+		switch {
+		case errors.Is(err, sequencing.ErrSequencerNotEnabled):
+		case errors.Is(err, driver.ErrSequencerAlreadyStopped):
+			n.log.Info("stopping node: sequencer already stopped", "latestHead", latestHead)
+		case err == nil:
+			n.log.Info("stopped sequencer", "latestHead", latestHead)
+		default:
+			result = multierror.Append(result, fmt.Errorf("error stopping sequencer: %w", err))
+		}
+	}
+
+	n.p2pMu.Lock()
 	if n.p2pNode != nil {
 		if err := n.p2pNode.Close(); err != nil {
 			result = multierror.Append(result, fmt.Errorf("failed to close p2p node: %w", err))
 		}
+		// Prevent further use of p2p.
+		n.p2pNode = nil
 	}
+	n.p2pMu.Unlock()
+
 	if n.p2pSigner != nil {
 		if err := n.p2pSigner.Close(); err != nil {
 			result = multierror.Append(result, fmt.Errorf("failed to close p2p signer: %w", err))
@@ -640,6 +718,20 @@ func (n *OpNode) Stop(ctx context.Context) error {
 		if err := n.l2Driver.Close(); err != nil {
 			result = multierror.Append(result, fmt.Errorf("failed to close L2 engine driver cleanly: %w", err))
 		}
+	}
+
+	// close the interop sub system
+	if n.supervisor != nil {
+		n.supervisor.Close()
+	}
+	if n.tmpInteropServer != nil {
+		if err := n.tmpInteropServer.Close(); err != nil {
+			result = multierror.Append(result, fmt.Errorf("failed to close interop RPC server: %w", err))
+		}
+	}
+
+	if n.eventSys != nil {
+		n.eventSys.Stop()
 	}
 
 	if n.safeDB != nil {
@@ -702,4 +794,21 @@ func (n *OpNode) HTTPEndpoint() string {
 		return ""
 	}
 	return fmt.Sprintf("http://%s", n.server.Addr().String())
+}
+
+func (n *OpNode) InteropRPC() (rpcEndpoint string, jwtSecret eth.Bytes32) {
+	if n.tmpInteropServer == nil {
+		return "", [32]byte{}
+	}
+	return n.tmpInteropServer.Endpoint(), [32]byte{} // tmp server has no secret
+}
+
+func (n *OpNode) getP2PNodeIfEnabled() *p2p.NodeP2P {
+	if !n.p2pEnabled() {
+		return nil
+	}
+
+	n.p2pMu.Lock()
+	defer n.p2pMu.Unlock()
+	return n.p2pNode
 }

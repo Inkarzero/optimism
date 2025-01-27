@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum-optimism/superchain-registry/superchain"
 )
 
-var OPStackSupport = params.ProtocolVersionV0{Build: [8]byte{}, Major: 8, Minor: 0, Patch: 0, PreRelease: 0}.Encode()
+var OPStackSupport = params.ProtocolVersionV0{Build: [8]byte{}, Major: 9, Minor: 0, Patch: 0, PreRelease: 0}.Encode()
 
 // LoadOPStackRollupConfig loads the rollup configuration of the requested chain ID from the superchain-registry.
 // Some chains may require a SystemConfigProvider to retrieve any values not part of the registry.
@@ -46,10 +46,18 @@ func LoadOPStackRollupConfig(chainID uint64) (*Config, error) {
 
 	var altDA *AltDAConfig
 	if chConfig.AltDA != nil {
-		altDA = &AltDAConfig{
-			DAChallengeAddress: common.Address(*chConfig.AltDA.DAChallengeAddress),
-			DAChallengeWindow:  *chConfig.AltDA.DAChallengeWindow,
-			DAResolveWindow:    *chConfig.AltDA.DAResolveWindow,
+		altDA = &AltDAConfig{}
+		if chConfig.AltDA.DAChallengeAddress != nil {
+			altDA.DAChallengeAddress = common.Address(*chConfig.AltDA.DAChallengeAddress)
+		}
+		if chConfig.AltDA.DAChallengeWindow != nil {
+			altDA.DAChallengeWindow = *chConfig.AltDA.DAChallengeWindow
+		}
+		if chConfig.AltDA.DAResolveWindow != nil {
+			altDA.DAResolveWindow = *chConfig.AltDA.DAResolveWindow
+		}
+		if chConfig.AltDA.DACommitmentType != nil {
+			altDA.CommitmentType = *chConfig.AltDA.DACommitmentType
 		}
 	}
 
@@ -83,6 +91,7 @@ func LoadOPStackRollupConfig(chainID uint64) (*Config, error) {
 		EcotoneTime:            chConfig.EcotoneTime,
 		FjordTime:              chConfig.FjordTime,
 		GraniteTime:            chConfig.GraniteTime,
+		HoloceneTime:           chConfig.HoloceneTime,
 		BatchInboxAddress:      common.Address(chConfig.BatchInboxAddr),
 		DepositContractAddress: common.Address(addrs.OptimismPortalProxy),
 		L1SystemConfigAddress:  common.Address(addrs.SystemConfigProxy),

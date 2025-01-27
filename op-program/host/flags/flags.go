@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ethereum-optimism/optimism/op-program/host/types"
 	"github.com/urfave/cli/v2"
 
 	"github.com/ethereum-optimism/optimism/op-node/chaincfg"
@@ -20,6 +21,14 @@ func prefixEnvVars(name string) []string {
 }
 
 var (
+	L2Custom = &cli.BoolFlag{
+		Name: "l2.custom",
+		Usage: "Override the L2 chain ID to the custom chain indicator for custom chain configuration not present in the client program. " +
+			"WARNING: This is not compatible with on-chain execution and must only be used for testing.",
+		EnvVars: prefixEnvVars("L2_CHAINID"),
+		Value:   false,
+		Hidden:  true,
+	}
 	RollupConfig = &cli.StringFlag{
 		Name:    "rollup.config",
 		Usage:   "Rollup chain parameters",
@@ -35,10 +44,21 @@ var (
 		Usage:   "Directory to use for preimage data storage. Default uses in-memory storage",
 		EnvVars: prefixEnvVars("DATADIR"),
 	}
+	DataFormat = &cli.StringFlag{
+		Name:    "data.format",
+		Usage:   fmt.Sprintf("Format to use for preimage data storage. Available formats: %s", openum.EnumString(types.SupportedDataFormats)),
+		EnvVars: prefixEnvVars("DATA_FORMAT"),
+		Value:   string(types.DataFormatDirectory),
+	}
 	L2NodeAddr = &cli.StringFlag{
 		Name:    "l2",
 		Usage:   "Address of L2 JSON-RPC endpoint to use (eth and debug namespace required)",
 		EnvVars: prefixEnvVars("L2_RPC"),
+	}
+	L2NodeExperimentalAddr = &cli.StringFlag{
+		Name:    "l2.experimental",
+		Usage:   "Address of L2 JSON-RPC endpoint to use for experimental features (debug_executionWitness)",
+		EnvVars: prefixEnvVars("L2_RPC_EXPERIMENTAL_RPC"),
 	}
 	L1Head = &cli.StringFlag{
 		Name:    "l1.head",
@@ -119,10 +139,13 @@ var requiredFlags = []cli.Flag{
 }
 
 var programFlags = []cli.Flag{
+	L2Custom,
 	RollupConfig,
 	Network,
 	DataDir,
+	DataFormat,
 	L2NodeAddr,
+	L2NodeExperimentalAddr,
 	L2GenesisPath,
 	L1NodeAddr,
 	L1BeaconAddr,
@@ -149,6 +172,12 @@ func CheckRequired(ctx *cli.Context) error {
 	}
 	if network == "" && ctx.String(L2GenesisPath.Name) == "" {
 		return fmt.Errorf("flag %s is required for custom networks", L2GenesisPath.Name)
+	}
+	if ctx.String(L2GenesisPath.Name) != "" && network != "" {
+		return fmt.Errorf("cannot specify both %s and %s", L2GenesisPath.Name, Network.Name)
+	}
+	if ctx.Bool(L2Custom.Name) && rollupConfig == "" {
+		return fmt.Errorf("flag %s cannot be used with named networks", L2Custom.Name)
 	}
 	for _, flag := range requiredFlags {
 		if !ctx.IsSet(flag.Names()[0]) {

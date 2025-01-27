@@ -1,27 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-// Target contract is imported by the `Bridge_Initializer`
-import { Bridge_Initializer } from "test/setup/Bridge_Initializer.sol";
+// Testing
+import { CommonTest } from "test/setup/CommonTest.sol";
 
-// Target contract dependencies
-import {
-    L2StandardBridgeInterop,
-    InvalidDecimals,
-    InvalidLegacyERC20Address,
-    InvalidSuperchainERC20Address,
-    InvalidTokenPair,
-    IOptimismERC20Factory,
-    MintableAndBurnable
-} from "src/L2/L2StandardBridgeInterop.sol";
+// Interfaces
+import { IMintableAndBurnableERC20 } from "interfaces/L2/IMintableAndBurnableERC20.sol";
+import { IL2StandardBridgeInterop } from "interfaces/L2/IL2StandardBridgeInterop.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-import { IOptimismMintableERC20 } from "src/universal/IOptimismMintableERC20.sol";
+import { IOptimismMintableERC20 } from "interfaces/universal/IOptimismMintableERC20.sol";
+import { ILegacyMintableERC20 } from "src/universal/OptimismMintableERC20.sol";
+import { IOptimismERC20Factory } from "interfaces/L2/IOptimismERC20Factory.sol";
 
-// TODO: Replace Predeploys.OPTIMISM_SUPERCHAIN_ERC20_FACTORY with optimismSuperchainERC20Factory
-import { Predeploys } from "src/libraries/Predeploys.sol";
-
-contract L2StandardBridgeInterop_Test is Bridge_Initializer {
+contract L2StandardBridgeInterop_Test is CommonTest {
     /// @notice Emitted when a conversion is made.
     event Converted(address indexed from, address indexed to, address indexed caller, uint256 amount);
 
@@ -39,21 +31,17 @@ contract L2StandardBridgeInterop_Test is Bridge_Initializer {
 
     /// @notice Mock ERC20 decimals
     function _mockDecimals(address _token, uint8 _decimals) internal {
-        _mockAndExpect(_token, abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(_decimals));
+        _mockAndExpect(_token, abi.encodeCall(IERC20Metadata.decimals, ()), abi.encode(_decimals));
     }
 
     /// @notice Mock ERC165 interface
     function _mockInterface(address _token, bytes4 _interfaceId, bool _supported) internal {
-        _mockAndExpect(
-            _token, abi.encodeWithSelector(IERC165.supportsInterface.selector, _interfaceId), abi.encode(_supported)
-        );
+        _mockAndExpect(_token, abi.encodeCall(IERC165.supportsInterface, (_interfaceId)), abi.encode(_supported));
     }
 
     /// @notice Mock factory deployment
     function _mockDeployments(address _factory, address _token, address _deployed) internal {
-        _mockAndExpect(
-            _factory, abi.encodeWithSelector(IOptimismERC20Factory.deployments.selector, _token), abi.encode(_deployed)
-        );
+        _mockAndExpect(_factory, abi.encodeCall(IOptimismERC20Factory.deployments, (_token)), abi.encode(_deployed));
     }
 
     /// @notice Assume a valid address for fuzzing
@@ -62,9 +50,18 @@ contract L2StandardBridgeInterop_Test is Bridge_Initializer {
     }
 }
 
-/// @notice Test suite when converting from a legacy token to a SuperchainERC20 token
+/// @notice Test suite for getter functions.
+contract L2StandardBridgeInterop_Getters_Test is L2StandardBridgeInterop_Test {
+    /// @notice Tests that the version function returns a valid string. We avoid testing the
+    ///         specific value of the string as it changes frequently.
+    function test_version_succeeds() external view {
+        assert(bytes(l2StandardBridge.version()).length > 0);
+    }
+}
+
+/// @notice Test suite when converting from a legacy token to a OptimismSuperchainERC20 token
 contract L2StandardBridgeInterop_LegacyToSuper_Test is L2StandardBridgeInterop_Test {
-    /// @notice Set up the test for converting from a legacy token to a SuperchainERC20 token
+    /// @notice Set up the test for converting from a legacy token to a OptimismSuperchainERC20 token
     function _setUpLegacyToSuper(address _from, address _to) internal {
         // Assume
         _assumeAddress(_from);
@@ -76,7 +73,7 @@ contract L2StandardBridgeInterop_LegacyToSuper_Test is L2StandardBridgeInterop_T
 
         // Mock `_from` to be a legacy address
         _mockInterface(_from, type(IERC165).interfaceId, true);
-        _mockInterface(_from, type(IOptimismMintableERC20).interfaceId, true);
+        _mockInterface(_from, type(ILegacyMintableERC20).interfaceId, true);
     }
 
     /// @notice Test that the `convert` function with different decimals reverts
@@ -101,7 +98,7 @@ contract L2StandardBridgeInterop_LegacyToSuper_Test is L2StandardBridgeInterop_T
         _mockDecimals(_to, _decimalsTo);
 
         // Expect the revert with `InvalidDecimals` selector
-        vm.expectRevert(InvalidDecimals.selector);
+        vm.expectRevert(IL2StandardBridgeInterop.InvalidDecimals.selector);
 
         // Act
         l2StandardBridge.convert(_from, _to, _amount);
@@ -116,7 +113,7 @@ contract L2StandardBridgeInterop_LegacyToSuper_Test is L2StandardBridgeInterop_T
         _mockDeployments(address(l2OptimismMintableERC20Factory), _from, address(0));
 
         // Expect the revert with `InvalidLegacyERC20Address` selector
-        vm.expectRevert(InvalidLegacyERC20Address.selector);
+        vm.expectRevert(IL2StandardBridgeInterop.InvalidLegacyERC20Address.selector);
 
         // Act
         l2StandardBridge.convert(_from, _to, _amount);
@@ -141,10 +138,10 @@ contract L2StandardBridgeInterop_LegacyToSuper_Test is L2StandardBridgeInterop_T
         _mockDeployments(address(l2OptimismMintableERC20Factory), _from, _remoteToken);
 
         // Mock the superchain factory to return address(0)
-        _mockDeployments(Predeploys.OPTIMISM_SUPERCHAIN_ERC20_FACTORY, _to, address(0));
+        _mockDeployments(address(l2OptimismSuperchainERC20Factory), _to, address(0));
 
         // Expect the revert with `InvalidSuperchainERC20Address` selector
-        vm.expectRevert(InvalidSuperchainERC20Address.selector);
+        vm.expectRevert(IL2StandardBridgeInterop.InvalidSuperchainERC20Address.selector);
 
         // Act
         l2StandardBridge.convert(_from, _to, _amount);
@@ -172,10 +169,10 @@ contract L2StandardBridgeInterop_LegacyToSuper_Test is L2StandardBridgeInterop_T
         _mockDeployments(address(l2OptimismMintableERC20Factory), _from, _fromRemoteToken);
 
         // Mock the superchain factory to return `_toRemoteToken`
-        _mockDeployments(Predeploys.OPTIMISM_SUPERCHAIN_ERC20_FACTORY, _to, _toRemoteToken);
+        _mockDeployments(address(l2OptimismSuperchainERC20Factory), _to, _toRemoteToken);
 
         // Expect the revert with `InvalidTokenPair` selector
-        vm.expectRevert(InvalidTokenPair.selector);
+        vm.expectRevert(IL2StandardBridgeInterop.InvalidTokenPair.selector);
 
         // Act
         l2StandardBridge.convert(_from, _to, _amount);
@@ -199,15 +196,15 @@ contract L2StandardBridgeInterop_LegacyToSuper_Test is L2StandardBridgeInterop_T
 
         // Mock the legacy and superchain factory to return `_remoteToken`
         _mockDeployments(address(l2OptimismMintableERC20Factory), _from, _remoteToken);
-        _mockDeployments(Predeploys.OPTIMISM_SUPERCHAIN_ERC20_FACTORY, _to, _remoteToken);
+        _mockDeployments(address(l2OptimismSuperchainERC20Factory), _to, _remoteToken);
 
         // Expect the `Converted` event to be emitted
         vm.expectEmit(address(l2StandardBridge));
         emit Converted(_from, _to, _caller, _amount);
 
         // Mock and expect the `burn` and `mint` functions
-        _mockAndExpect(_from, abi.encodeWithSelector(MintableAndBurnable.burn.selector, _caller, _amount), abi.encode());
-        _mockAndExpect(_to, abi.encodeWithSelector(MintableAndBurnable.mint.selector, _caller, _amount), abi.encode());
+        _mockAndExpect(_from, abi.encodeCall(IMintableAndBurnableERC20.burn, (_caller, _amount)), abi.encode());
+        _mockAndExpect(_to, abi.encodeCall(IMintableAndBurnableERC20.mint, (_caller, _amount)), abi.encode());
 
         // Act
         vm.prank(_caller);
@@ -215,9 +212,9 @@ contract L2StandardBridgeInterop_LegacyToSuper_Test is L2StandardBridgeInterop_T
     }
 }
 
-/// @notice Test suite when converting from a SuperchainERC20 token to a legacy token
+/// @notice Test suite when converting from a OptimismSuperchainERC20 token to a legacy token
 contract L2StandardBridgeInterop_SuperToLegacy_Test is L2StandardBridgeInterop_Test {
-    /// @notice Set up the test for converting from a SuperchainERC20 token to a legacy token
+    /// @notice Set up the test for converting from a OptimismSuperchainERC20 token to a legacy token
     function _setUpSuperToLegacy(address _from, address _to) internal {
         // Assume
         _assumeAddress(_from);
@@ -226,6 +223,11 @@ contract L2StandardBridgeInterop_SuperToLegacy_Test is L2StandardBridgeInterop_T
         // Mock same decimals
         _mockDecimals(_from, 18);
         _mockDecimals(_to, 18);
+
+        // Mock `_from` so it is not a LegacyMintableERC20 address
+        _mockInterface(_from, type(IERC165).interfaceId, true);
+        _mockInterface(_from, type(ILegacyMintableERC20).interfaceId, false);
+        _mockInterface(_from, type(IOptimismMintableERC20).interfaceId, false);
     }
 
     /// @notice Test that the `convert` function with different decimals reverts
@@ -250,7 +252,7 @@ contract L2StandardBridgeInterop_SuperToLegacy_Test is L2StandardBridgeInterop_T
         _mockDecimals(_to, _decimalsTo);
 
         // Expect the revert with `InvalidDecimals` selector
-        vm.expectRevert(InvalidDecimals.selector);
+        vm.expectRevert(IL2StandardBridgeInterop.InvalidDecimals.selector);
 
         // Act
         l2StandardBridge.convert(_from, _to, _amount);
@@ -265,7 +267,7 @@ contract L2StandardBridgeInterop_SuperToLegacy_Test is L2StandardBridgeInterop_T
         _mockDeployments(address(l2OptimismMintableERC20Factory), _to, address(0));
 
         // Expect the revert with `InvalidLegacyERC20Address` selector
-        vm.expectRevert(InvalidLegacyERC20Address.selector);
+        vm.expectRevert(IL2StandardBridgeInterop.InvalidLegacyERC20Address.selector);
 
         // Act
         l2StandardBridge.convert(_from, _to, _amount);
@@ -290,10 +292,10 @@ contract L2StandardBridgeInterop_SuperToLegacy_Test is L2StandardBridgeInterop_T
         _mockDeployments(address(l2OptimismMintableERC20Factory), _to, _remoteToken);
 
         // Mock the superchain factory to return address(0)
-        _mockDeployments(Predeploys.OPTIMISM_SUPERCHAIN_ERC20_FACTORY, _from, address(0));
+        _mockDeployments(address(l2OptimismSuperchainERC20Factory), _from, address(0));
 
         // Expect the revert with `InvalidSuperchainERC20Address` selector
-        vm.expectRevert(InvalidSuperchainERC20Address.selector);
+        vm.expectRevert(IL2StandardBridgeInterop.InvalidSuperchainERC20Address.selector);
 
         // Act
         l2StandardBridge.convert(_from, _to, _amount);
@@ -321,10 +323,10 @@ contract L2StandardBridgeInterop_SuperToLegacy_Test is L2StandardBridgeInterop_T
         _mockDeployments(address(l2OptimismMintableERC20Factory), _to, _fromRemoteToken);
 
         // Mock the superchain factory to return `_toRemoteToken`
-        _mockDeployments(Predeploys.OPTIMISM_SUPERCHAIN_ERC20_FACTORY, _from, _toRemoteToken);
+        _mockDeployments(address(l2OptimismSuperchainERC20Factory), _from, _toRemoteToken);
 
         // Expect the revert with `InvalidTokenPair` selector
-        vm.expectRevert(InvalidTokenPair.selector);
+        vm.expectRevert(IL2StandardBridgeInterop.InvalidTokenPair.selector);
 
         // Act
         l2StandardBridge.convert(_from, _to, _amount);
@@ -348,15 +350,15 @@ contract L2StandardBridgeInterop_SuperToLegacy_Test is L2StandardBridgeInterop_T
 
         // Mock the legacy and superchain factory to return `_remoteToken`
         _mockDeployments(address(l2OptimismMintableERC20Factory), _to, _remoteToken);
-        _mockDeployments(Predeploys.OPTIMISM_SUPERCHAIN_ERC20_FACTORY, _from, _remoteToken);
+        _mockDeployments(address(l2OptimismSuperchainERC20Factory), _from, _remoteToken);
 
         // Expect the `Converted` event to be emitted
         vm.expectEmit(address(l2StandardBridge));
         emit Converted(_from, _to, _caller, _amount);
 
         // Mock and expect the `burn` and `mint` functions
-        _mockAndExpect(_from, abi.encodeWithSelector(MintableAndBurnable.burn.selector, _caller, _amount), abi.encode());
-        _mockAndExpect(_to, abi.encodeWithSelector(MintableAndBurnable.mint.selector, _caller, _amount), abi.encode());
+        _mockAndExpect(_from, abi.encodeCall(IMintableAndBurnableERC20.burn, (_caller, _amount)), abi.encode());
+        _mockAndExpect(_to, abi.encodeCall(IMintableAndBurnableERC20.mint, (_caller, _amount)), abi.encode());
 
         // Act
         vm.prank(_caller);
