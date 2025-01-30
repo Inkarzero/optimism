@@ -216,6 +216,7 @@ func (s *State) Prune(origin eth.BlockID) {
 // pruneCommitments removes commitments which have are beyond a given block number.
 // It will remove commitments in order of inclusion until it finds a commitment which is not beyond the given block number.
 func (s *State) pruneCommitments(origin eth.BlockID) {
+	s.log.Debug("optimism/op-alt-da/dastate.go | pruneCommitments | ", "origin", origin, "len(s.expiredCommitments)", len(s.expiredCommitments), "s.expiredCommitments", s.expiredCommitments)
 	for len(s.expiredCommitments) > 0 {
 		c := s.expiredCommitments[0]
 		challenge, ok := s.GetChallenge(c.data, c.inclusionBlock.Number)
