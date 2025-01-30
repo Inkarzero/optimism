@@ -194,6 +194,7 @@ func (fi *Finalizer) onDerivationIdle(derivedFrom eth.L1BlockRef) {
 	fi.mu.Lock()
 	defer fi.mu.Unlock()
 	if fi.finalizedL1 == (eth.L1BlockRef{}) {
+		fi.log.Debug("op-node/rollup/finality/finalizer.go | onDerivationIdle | no L1 information is finalized yet skipping", "derivedFrom", derivedFrom)
 		return // if no L1 information is finalized yet, then skip this
 	}
 	// If we recently tried finalizing, then don't try again just yet, but traverse more of L1 first.
