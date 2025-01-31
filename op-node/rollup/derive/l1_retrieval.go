@@ -47,6 +47,7 @@ func (l1r *L1Retrieval) Origin() eth.L1BlockRef {
 // If there is data, it pushes it to the next stage.
 // If there is no more data open ourselves if we are closed or close ourselves if we are open
 func (l1r *L1Retrieval) NextData(ctx context.Context) ([]byte, error) {
+	l1r.log.Debug("optimism/op-node/rollup/derive/l1_retrieval.go | NextData | ", "l1r", l1r)
 	if l1r.datas == nil {
 		next, err := l1r.prev.NextL1Block(ctx)
 		if err == io.EOF {
@@ -76,6 +77,7 @@ func (l1r *L1Retrieval) NextData(ctx context.Context) ([]byte, error) {
 // Note that we open up the `l1r.datas` here because it is required to maintain the
 // internal invariants that later propagate up the derivation pipeline.
 func (l1r *L1Retrieval) Reset(ctx context.Context, base eth.L1BlockRef, sysCfg eth.SystemConfig) error {
+	l1r.log.Debug("optimism/op-node/rollup/derive/l1_retrieval.go | Reset | ", "base", base, "sysCfg", sysCfg)
 	var err error
 	if l1r.datas, err = l1r.dataSrc.OpenData(ctx, base, sysCfg.BatcherAddr); err != nil {
 		return fmt.Errorf("failed to open data source: %w", err)
