@@ -143,7 +143,7 @@ func (d *DA) updateFinalizedFromL1(ctx context.Context, l1 L1Fetcher) error {
 
 // Finalize sets the L1 finalized head signal and calls the handler function if set.
 func (d *DA) Finalize(l1Finalized eth.L1BlockRef) {
-	d.log.Debug("optimism/op-alt-da/damgr.go | Finalize | ", "l1Finalized", l1Finalized)
+	d.log.Debug("optimism/op-alt-da/damgr.go | Finalize | ", "l1Finalized", l1Finalized, "d.finalizedHead", d.finalizedHead)
 	d.updateFinalizedHead(l1Finalized)
 	d.metrics.RecordChallengesHead("finalized", d.finalizedHead.Number)
 

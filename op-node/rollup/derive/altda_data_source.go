@@ -33,6 +33,7 @@ func NewAltDADataSource(log log.Logger, src DataIter, l1 L1Fetcher, fetcher AltD
 }
 
 func (s *AltDADataSource) Next(ctx context.Context) (eth.Data, error) {
+	s.log.Debug("optimism/op-node/rollup/derive/altda_data_source.go | Next | ", "comm", s.comm)
 	// Process origin syncs the challenge contract events and updates the local challenge states
 	// before we can proceed to fetch the input data. This function can be called multiple times
 	// for the same origin and noop if the origin was already processed. It is also called if

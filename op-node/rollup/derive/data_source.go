@@ -65,6 +65,7 @@ func NewDataSourceFactory(log log.Logger, cfg *rollup.Config, fetcher L1Fetcher,
 
 // OpenData returns the appropriate data source for the L1 block `ref`.
 func (ds *DataSourceFactory) OpenData(ctx context.Context, ref eth.L1BlockRef, batcherAddr common.Address) (DataIter, error) {
+	ds.log.Debug("optimism/op-node/rollup/derive/data_source.go | OpenData | ", "ref", ref, "batcherAddr", batcherAddr)
 	// Creates a data iterator from blob or calldata source so we can forward it to the altDA source
 	// if enabled as it still requires an L1 data source for fetching input commmitments.
 	var src DataIter
