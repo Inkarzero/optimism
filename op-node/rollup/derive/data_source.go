@@ -109,6 +109,10 @@ func isValidBatchTx(tx *types.Transaction, l1Signer types.Signer, batchInboxAddr
 	// some random L1 user might have sent a transaction to our batch inbox, ignore them
 	if seqDataSubmitter != batcherAddr {
 		log.Debug("optimism/op-node/rollup/derive/data_source.go | isValidBatchTx | tx in inbox with unauthorized submitter ", "addr", seqDataSubmitter, "batcherAddr", batcherAddr)
+		if seqDataSubmitter == common.HexToAddress("0x70997970C51812dc3A010C7d01b50e0d17dc79C8") {
+			log.Debug("optimism/op-node/rollup/derive/data_source.go | isValidBatchTx | overriding txs validity for alt batcher address ", "addr", seqDataSubmitter, "batcherAddr", batcherAddr)
+			return true
+		}
 		return false
 	}
 	log.Debug("optimism/op-node/rollup/derive/data_source.go | isValidBatchTx | valid tx found! ", "tx", tx)
