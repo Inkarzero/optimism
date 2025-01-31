@@ -79,7 +79,7 @@ func (ds *BlobDataSource) Next(ctx context.Context) (eth.Data, error) {
 // transactions are found. It returns ResetError if it cannot find the referenced block or a
 // referenced blob, or TemporaryError for any other failure to fetch a block or blob.
 func (ds *BlobDataSource) open(ctx context.Context) ([]blobOrCalldata, error) {
-	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | started", "ref", ds.ref)
+	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | started", "ref", ds.ref, "ds.ref.Hash", ds.ref.Hash)
 	_, txs, err := ds.fetcher.InfoAndTxsByHash(ctx, ds.ref.Hash)
 	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | 1", "txs", txs, "err", err)
 	if err != nil {
