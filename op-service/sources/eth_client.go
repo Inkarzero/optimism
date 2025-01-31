@@ -278,12 +278,15 @@ func (s *EthClient) InfoByLabel(ctx context.Context, label eth.BlockLabel) (eth.
 }
 
 func (s *EthClient) InfoAndTxsByHash(ctx context.Context, hash common.Hash) (eth.BlockInfo, types.Transactions, error) {
-	s.log.Debug("op-service/sources/eth_client.go | InfoAndTxsByHash | started", "hash", hash)
+	s.log.Debug("op-service/sources/eth_client.go | InfoAndTxsByHash | started", "hash", hash, "ctx", ctx)
 	if header, ok := s.headersCache.Get(hash); ok {
+		s.log.Debug("op-service/sources/eth_client.go | InfoAndTxsByHash | Found header in cache", "header", header)
 		if txs, ok := s.transactionsCache.Get(hash); ok {
+			s.log.Debug("op-service/sources/eth_client.go | InfoAndTxsByHash | Found txs in cache", "txs", txs)
 			return header, txs, nil
 		}
 	}
+	s.log.Debug("op-service/sources/eth_client.go | InfoAndTxsByHash | Not found in cache", "hash", hash)
 	return s.blockCall(ctx, "eth_getBlockByHash", hashID(hash))
 }
 
