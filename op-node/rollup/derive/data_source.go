@@ -95,21 +95,22 @@ type DataSourceConfig struct {
 //  1. the transaction has a To() address that matches the batch inbox address, and
 //  2. the transaction has a valid signature from the batcher address
 func isValidBatchTx(tx *types.Transaction, l1Signer types.Signer, batchInboxAddr, batcherAddr common.Address) bool {
-	log.Debug("optimism/op-node/rollup/derive/data_source.go | isValidBatchTx | ", "tx", tx, "l1Signer", l1Signer, "batchInboxAddr", batchInboxAddr, "batcherAddr", batcherAddr)
+	log.Debug("optimism/op-node/rollup/derive/data_source.go | isValidBatchTx | started ", "tx", tx, "l1Signer", l1Signer, "batchInboxAddr", batchInboxAddr, "batcherAddr", batcherAddr)
 	to := tx.To()
 	if to == nil || *to != batchInboxAddr {
-		log.Debug("optimism/op-node/rollup/derive/data_source.go | isValidBatchTx | tx.To() != batchInboxAddr", "tx.To()", to, "batchInboxAddr", batchInboxAddr)
+		log.Debug("optimism/op-node/rollup/derive/data_source.go | isValidBatchTx | Transaction is not for batcher ", to, "batchInboxAddr", batchInboxAddr)
 		return false
 	}
 	seqDataSubmitter, err := l1Signer.Sender(tx) // optimization: only derive sender if To is correct
 	if err != nil {
-		log.Debug("optimism/op-node/rollup/derive/data_source.go | isValidBatchTx | tx in inbox with invalid signature? err != nil", "err", err)
+		log.Debug("optimism/op-node/rollup/derive/data_source.go | isValidBatchTx | tx in inbox with invalid signature? err != nil ", "err", err)
 		return false
 	}
 	// some random L1 user might have sent a transaction to our batch inbox, ignore them
 	if seqDataSubmitter != batcherAddr {
-		log.Debug("optimism/op-node/rollup/derive/data_source.go | isValidBatchTx | tx in inbox with unauthorized submitter", "addr", seqDataSubmitter, "hash", tx.Hash(), "err", err)
+		log.Debug("optimism/op-node/rollup/derive/data_source.go | isValidBatchTx | tx in inbox with unauthorized submitter ", "addr", seqDataSubmitter, "batcherAddr", batcherAddr)
 		return false
 	}
+	log.Debug("optimism/op-node/rollup/derive/data_source.go | isValidBatchTx | valid tx found! ", "tx", tx)
 	return true
 }
