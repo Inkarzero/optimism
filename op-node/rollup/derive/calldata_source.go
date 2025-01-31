@@ -54,6 +54,7 @@ func NewCalldataSource(ctx context.Context, log log.Logger, dsCfg DataSourceConf
 // will attempt to reinitialize itself. If it cannot find the block it returns a ResetError
 // otherwise it returns a temporary error if fetching the block returns an error.
 func (ds *CalldataSource) Next(ctx context.Context) (eth.Data, error) {
+	ds.log.Debug("optimism/op-node/rollup/derive/calldata_source.go | Next | ", "ds", ds)
 	if !ds.open {
 		if _, txs, err := ds.fetcher.InfoAndTxsByHash(ctx, ds.ref.Hash); err == nil {
 			ds.open = true
@@ -77,6 +78,7 @@ func (ds *CalldataSource) Next(ctx context.Context) (eth.Data, error) {
 // that are sent to the batch inbox address from the batch sender address.
 // This will return an empty array if no valid transactions are found.
 func DataFromEVMTransactions(dsCfg DataSourceConfig, batcherAddr common.Address, txs types.Transactions, log log.Logger) []eth.Data {
+	log.Debug("optimism/op-node/rollup/derive/calldata_source.go | DataFromEVMTransactions | ", "dsCfg", dsCfg, "batcherAddr", batcherAddr, "txs", txs)
 	out := []eth.Data{}
 	for _, tx := range txs {
 		if isValidBatchTx(tx, dsCfg.l1Signer, dsCfg.batchInboxAddress, batcherAddr) {

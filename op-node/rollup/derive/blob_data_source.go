@@ -48,6 +48,7 @@ func NewBlobDataSource(ctx context.Context, log log.Logger, dsCfg DataSourceConf
 // ResetError if it cannot find the referenced block or a referenced blob, or TemporaryError for
 // any other failure to fetch a block or blob.
 func (ds *BlobDataSource) Next(ctx context.Context) (eth.Data, error) {
+	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | Next | ", "ds", ds)
 	if ds.data == nil {
 		var err error
 		if ds.data, err = ds.open(ctx); err != nil {
@@ -78,6 +79,7 @@ func (ds *BlobDataSource) Next(ctx context.Context) (eth.Data, error) {
 // transactions are found. It returns ResetError if it cannot find the referenced block or a
 // referenced blob, or TemporaryError for any other failure to fetch a block or blob.
 func (ds *BlobDataSource) open(ctx context.Context) ([]blobOrCalldata, error) {
+	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | ", "ref", ds.ref)
 	_, txs, err := ds.fetcher.InfoAndTxsByHash(ctx, ds.ref.Hash)
 	if err != nil {
 		if errors.Is(err, ethereum.NotFound) {
@@ -116,6 +118,7 @@ func (ds *BlobDataSource) open(ctx context.Context) ([]blobOrCalldata, error) {
 // creates a placeholder blobOrCalldata element for each returned blob hash that must be populated
 // by fillBlobPointers after blob bodies are retrieved.
 func dataAndHashesFromTxs(txs types.Transactions, config *DataSourceConfig, batcherAddr common.Address) ([]blobOrCalldata, []eth.IndexedBlobHash) {
+	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | ", "txs", txs)
 	data := []blobOrCalldata{}
 	var hashes []eth.IndexedBlobHash
 	blobIndex := 0 // index of each blob in the block's blob sidecar
