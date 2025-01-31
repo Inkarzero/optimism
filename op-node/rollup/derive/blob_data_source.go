@@ -89,7 +89,7 @@ func (ds *BlobDataSource) open(ctx context.Context) ([]blobOrCalldata, error) {
 		return nil, NewTemporaryError(fmt.Errorf("failed to open blob data source: %w", err))
 	}
 
-	data, hashes := dataAndHashesFromTxs(txs, &ds.dsCfg, ds.batcherAddr)
+	data, hashes := dataAndHashesFromTxs(txs, &ds.dsCfg, ds.batcherAddr, ds.log)
 	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | 2", "data", data, "hashes", hashes)
 	if len(hashes) == 0 {
 		// there are no blobs to fetch so we can return immediately
@@ -121,26 +121,32 @@ func (ds *BlobDataSource) open(ctx context.Context) ([]blobOrCalldata, error) {
 // dataAndHashesFromTxs extracts calldata and datahashes from the input transactions and returns them. It
 // creates a placeholder blobOrCalldata element for each returned blob hash that must be populated
 // by fillBlobPointers after blob bodies are retrieved.
-func dataAndHashesFromTxs(txs types.Transactions, config *DataSourceConfig, batcherAddr common.Address) ([]blobOrCalldata, []eth.IndexedBlobHash) {
+func dataAndHashesFromTxs(txs types.Transactions, config *DataSourceConfig, batcherAddr common.Address, log log.Logger) ([]blobOrCalldata, []eth.IndexedBlobHash) {
+	log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | started", "txs", txs, "config", config, "batcherAddr", batcherAddr)
 	data := []blobOrCalldata{}
 	var hashes []eth.IndexedBlobHash
 	blobIndex := 0 // index of each blob in the block's blob sidecar
 	for _, tx := range txs {
 		// skip any non-batcher transactions
+		log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | 1 started for ", "tx", tx)
 		if !isValidBatchTx(tx, config.l1Signer, config.batchInboxAddress, batcherAddr) {
 			blobIndex += len(tx.BlobHashes())
 			continue
 		}
+		log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | 2 tx is valid ", "tx", tx)
 		// handle non-blob batcher transactions by extracting their calldata
 		if tx.Type() != types.BlobTxType {
 			calldata := eth.Data(tx.Data())
 			data = append(data, blobOrCalldata{nil, &calldata})
 			continue
 		}
+		log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | 3 tx is of valid blob type ", "tx", tx)
 		// handle blob batcher transactions by extracting their blob hashes, ignoring any calldata.
 		if len(tx.Data()) > 0 {
 			log.Warn("blob tx has calldata, which will be ignored", "txhash", tx.Hash())
+			log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | 3.5 tx has calldata ", "tx", tx, "tx.Data()", tx.Data())
 		}
+		log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | 4 tx started checking BlobHashes ", "tx", tx, "tx.BlobHashes()", tx.BlobHashes())
 		for _, h := range tx.BlobHashes() {
 			idh := eth.IndexedBlobHash{
 				Index: uint64(blobIndex),
