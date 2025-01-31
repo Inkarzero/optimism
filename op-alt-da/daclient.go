@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // ErrNotFound is returned when the server could not find the input.
@@ -31,6 +33,7 @@ func NewDAClient(url string, verify bool, pc bool) *DAClient {
 
 // GetInput returns the input data for the given encoded commitment bytes.
 func (c *DAClient) GetInput(ctx context.Context, comm CommitmentData) ([]byte, error) {
+	log.Debug("optimism/op-alt-da/daclient.go | GetInput | ", "comm", comm)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/get/0x%x", c.url, comm.Encode()), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
