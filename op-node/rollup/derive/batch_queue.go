@@ -241,6 +241,7 @@ func (bq *BatchQueue) AddBatch(ctx context.Context, batch Batch, parent eth.L2Bl
 // based on currently available buffered batch and L1 origin information.
 // If no batch can be derived yet, then (nil, io.EOF) is returned.
 func (bq *BatchQueue) deriveNextBatch(ctx context.Context, outOfData bool, parent eth.L2BlockRef) (Batch, error) {
+	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | 1 ", "parent", parent, "outOfData", outOfData)
 	if len(bq.l1Blocks) == 0 {
 		return nil, NewCriticalError(errors.New("cannot derive next batch, no origin was prepared"))
 	}
@@ -264,8 +265,10 @@ func (bq *BatchQueue) deriveNextBatch(ctx context.Context, outOfData bool, paren
 	// We filter in-place by only remembering the batches that may be processed in the future, or those we are undecided on.
 	var remaining []*BatchWithL1InclusionBlock
 batchLoop:
+	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | 2 batchLoop start", "batches", bq.batches)
 	for i, batch := range bq.batches {
 		validity := CheckBatch(ctx, bq.config, bq.log.New("batch_index", i), bq.l1Blocks, parent, batch, bq.l2)
+		bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | 3 CheckBatch", "validity", validity)
 		switch validity {
 		case BatchFuture:
 			remaining = append(remaining, batch)
@@ -291,12 +294,12 @@ batchLoop:
 		}
 	}
 	bq.batches = remaining
-
+	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | 4 ", "nextBatch", nextBatch)
 	if nextBatch != nil {
 		nextBatch.Batch.LogContext(bq.log).Info("Found next batch")
 		return nextBatch.Batch, nil
 	}
-
+	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | 5 ", "epoch", epoch, "parent", parent, "outOfData", outOfData)
 	// If the current epoch is too old compared to the L1 block we are at,
 	// i.e. if the sequence window expired, we create empty batches for the current epoch
 	expiryEpoch := epoch.Number + bq.config.SeqWindowSize
@@ -306,21 +309,24 @@ batchLoop:
 	bq.log.Trace("Potentially generating an empty batch",
 		"expiryEpoch", expiryEpoch, "forceEmptyBatches", forceEmptyBatches, "nextTimestamp", nextTimestamp,
 		"epoch_time", epoch.Time, "len_l1_blocks", len(bq.l1Blocks), "firstOfEpoch", firstOfEpoch)
-
+	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | 6 ", "epoch", epoch, "parent", parent, "outOfData", outOfData,
+		"forceEmptyBatches", forceEmptyBatches, "firstOfEpoch", firstOfEpoch)
 	if !forceEmptyBatches {
 		// sequence window did not expire yet, still room to receive batches for the current epoch,
 		// no need to force-create empty batch(es) towards the next epoch yet.
 		return nil, io.EOF
 	}
+	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | 7 ")
 	if len(bq.l1Blocks) < 2 {
 		// need next L1 block to proceed towards
 		return nil, io.EOF
 	}
-
+	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | 8 ")
 	nextEpoch := bq.l1Blocks[1]
 	// Fill with empty L2 blocks of the same epoch until we meet the time of the next L1 origin,
 	// to preserve that L2 time >= L1 time. If this is the first block of the epoch, always generate a
 	// batch to ensure that we at least have one batch per epoch.
+	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | 9 ")
 	if nextTimestamp < nextEpoch.Time || firstOfEpoch {
 		bq.log.Info("Generating next batch", "epoch", epoch, "timestamp", nextTimestamp)
 		return &SingularBatch{
@@ -331,10 +337,12 @@ batchLoop:
 			Transactions: nil,
 		}, nil
 	}
+	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | 10 ")
 
 	// At this point we have auto generated every batch for the current epoch
 	// that we can, so we can advance to the next epoch.
 	bq.log.Trace("Advancing internal L1 blocks", "next_timestamp", nextTimestamp, "next_epoch_time", nextEpoch.Time)
 	bq.l1Blocks = bq.l1Blocks[1:]
+	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | 11 ")
 	return nil, io.EOF
 }
