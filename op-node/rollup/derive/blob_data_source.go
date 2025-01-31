@@ -79,8 +79,9 @@ func (ds *BlobDataSource) Next(ctx context.Context) (eth.Data, error) {
 // transactions are found. It returns ResetError if it cannot find the referenced block or a
 // referenced blob, or TemporaryError for any other failure to fetch a block or blob.
 func (ds *BlobDataSource) open(ctx context.Context) ([]blobOrCalldata, error) {
-	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | ", "ref", ds.ref)
+	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | started", "ref", ds.ref)
 	_, txs, err := ds.fetcher.InfoAndTxsByHash(ctx, ds.ref.Hash)
+	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | 1", "txs", txs, "err", err)
 	if err != nil {
 		if errors.Is(err, ethereum.NotFound) {
 			return nil, NewResetError(fmt.Errorf("failed to open blob data source: %w", err))
@@ -89,7 +90,7 @@ func (ds *BlobDataSource) open(ctx context.Context) ([]blobOrCalldata, error) {
 	}
 
 	data, hashes := dataAndHashesFromTxs(txs, &ds.dsCfg, ds.batcherAddr)
-
+	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | 2", "data", data, "hashes", hashes)
 	if len(hashes) == 0 {
 		// there are no blobs to fetch so we can return immediately
 		return data, nil
@@ -97,6 +98,7 @@ func (ds *BlobDataSource) open(ctx context.Context) ([]blobOrCalldata, error) {
 
 	// download the actual blob bodies corresponding to the indexed blob hashes
 	blobs, err := ds.blobsFetcher.GetBlobs(ctx, ds.ref, hashes)
+	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | 3", "blobs", blobs, "err", err)
 	if errors.Is(err, ethereum.NotFound) {
 		// If the L1 block was available, then the blobs should be available too. The only
 		// exception is if the blob retention window has expired, which we will ultimately handle
@@ -109,8 +111,10 @@ func (ds *BlobDataSource) open(ctx context.Context) ([]blobOrCalldata, error) {
 	// go back over the data array and populate the blob pointers
 	if err := fillBlobPointers(data, blobs); err != nil {
 		// this shouldn't happen unless there is a bug in the blobs fetcher
+		ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | 4", "err", err)
 		return nil, NewResetError(fmt.Errorf("failed to fill blob pointers: %w", err))
 	}
+	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | finished", "data", data)
 	return data, nil
 }
 
