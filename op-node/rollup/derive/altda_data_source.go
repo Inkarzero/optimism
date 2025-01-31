@@ -49,6 +49,7 @@ func (s *AltDADataSource) Next(ctx context.Context) (eth.Data, error) {
 		// the l1 source returns the input commitment for the batch.
 		s.log.Debug("optimism/op-node/rollup/derive/altda_data_source.go | Next | 1")
 		data, err := s.src.Next(ctx)
+		s.log.Debug("optimism/op-node/rollup/derive/altda_data_source.go | Next | 1.5", "data", data, "err", err)
 		if err != nil {
 			return nil, err
 		}
