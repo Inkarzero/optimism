@@ -46,7 +46,7 @@ func StartDAServer(cliCtx *cli.Context) error {
 	if err := server.Start(); err != nil {
 		return fmt.Errorf("failed to start the DA server")
 	} else {
-		l.Info("Started DA Server")
+		l.Info("Started DA Server", "cfg.UseGenericComm", cfg.UseGenericComm)
 	}
 
 	defer func() {
