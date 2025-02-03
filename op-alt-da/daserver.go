@@ -142,8 +142,9 @@ func (d *DAServer) HandlePut(w http.ResponseWriter, r *http.Request) {
 
 	if r.URL.Path == "/put" || r.URL.Path == "/put/" { // without commitment
 		var comm []byte
+		d.log.Info("1")
 		if d.useGenericComm {
-			d.log.Debug("optimism/op-alt-da/daserver.go | HandlePut | useGenericComm", "useGenericComm", d.useGenericComm, "comm", comm)
+			d.log.Info("optimism/op-alt-da/daserver.go | HandlePut | useGenericComm", "useGenericComm", d.useGenericComm, "comm", comm)
 			n, err := rand.Int(rand.Reader, big.NewInt(99999999999999))
 			if err != nil {
 				d.log.Error("Failed to generate commitment", "err", err)
@@ -155,15 +156,16 @@ func (d *DAServer) HandlePut(w http.ResponseWriter, r *http.Request) {
 			comm = append(comm, n.Bytes()...)
 
 		} else {
-			d.log.Debug("optimism/op-alt-da/daserver.go | HandlePut | useKeccak256", "useGenericComm", d.useGenericComm, "comm", comm)
+			d.log.Info("optimism/op-alt-da/daserver.go | HandlePut | useKeccak256", "useGenericComm", d.useGenericComm, "comm", comm)
 			comm = NewKeccak256Commitment(input).Encode()
 		}
-
+		d.log.Info("2")
 		if err = d.store.Put(r.Context(), comm, input); err != nil {
 			d.log.Error("Failed to store commitment to the DA server", "err", err, "comm", comm)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		d.log.Info("3")
 		d.log.Info("stored commitment1", "key", hex.EncodeToString(comm), "input_len", len(input))
 
 		if _, err := w.Write(comm); err != nil {
