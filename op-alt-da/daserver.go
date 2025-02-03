@@ -143,6 +143,7 @@ func (d *DAServer) HandlePut(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/put" || r.URL.Path == "/put/" { // without commitment
 		var comm []byte
 		if d.useGenericComm {
+			d.log.Debug("optimism/op-alt-da/daserver.go | HandlePut | useGenericComm", "useGenericComm", d.useGenericComm, "comm", comm)
 			n, err := rand.Int(rand.Reader, big.NewInt(99999999999999))
 			if err != nil {
 				d.log.Error("Failed to generate commitment", "err", err)
@@ -154,6 +155,7 @@ func (d *DAServer) HandlePut(w http.ResponseWriter, r *http.Request) {
 			comm = append(comm, n.Bytes()...)
 
 		} else {
+			d.log.Debug("optimism/op-alt-da/daserver.go | HandlePut | useKeccak256", "useGenericComm", d.useGenericComm, "comm", comm)
 			comm = NewKeccak256Commitment(input).Encode()
 		}
 
