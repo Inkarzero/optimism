@@ -520,8 +520,8 @@ func (c *Config) GetOPAltDAConfig() (altda.Config, error) {
 	}
 	return altda.Config{
 		DAChallengeContractAddress: c.AltDAConfig.DAChallengeAddress,
-		ChallengeWindow:            3600, //c.AltDAConfig.DAChallengeWindow,
-		ResolveWindow:              3600, //c.AltDAConfig.DAResolveWindow,
+		ChallengeWindow:            c.AltDAConfig.DAChallengeWindow,
+		ResolveWindow:              c.AltDAConfig.DAResolveWindow,
 		CommitmentType:             t,
 	}, nil
 }
