@@ -164,7 +164,7 @@ func (d *DAServer) HandlePut(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		d.log.Info("stored commitment", "key", hex.EncodeToString(comm), "input_len", len(input))
+		d.log.Info("stored commitment1", "key", hex.EncodeToString(comm), "input_len", len(input))
 
 		if _, err := w.Write(comm); err != nil {
 			d.log.Error("Failed to write commitment request body", "err", err, "comm", comm)
