@@ -47,12 +47,13 @@ func NewAltDAFinalizer(ctx context.Context, log log.Logger, cfg *rollup.Config,
 }
 
 func (fi *AltDAFinalizer) OnEvent(ev event.Event) bool {
-	fi.Finalizer.log.Debug("optimism/op-node/rollup/finality/altda.go | OnEvent | ", "ev", ev)
 	switch x := ev.(type) {
 	case FinalizeL1Event:
+		fi.Finalizer.log.Debug("optimism/op-node/rollup/finality/altda.go | OnEvent | FinalizeL1Event", "ev", ev)
 		fi.backend.Finalize(x.FinalizedL1)
 		return true
 	default:
+		fi.Finalizer.log.Debug("optimism/op-node/rollup/finality/altda.go | OnEvent | Not handled, forwarding to regular finalizer", "ev", ev)
 		return fi.Finalizer.OnEvent(ev)
 	}
 }
