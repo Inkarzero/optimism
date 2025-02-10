@@ -48,7 +48,7 @@ func NewBlobDataSource(ctx context.Context, log log.Logger, dsCfg DataSourceConf
 // ResetError if it cannot find the referenced block or a referenced blob, or TemporaryError for
 // any other failure to fetch a block or blob.
 func (ds *BlobDataSource) Next(ctx context.Context) (eth.Data, error) {
-	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | Next | ", "ds", ds)
+	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | Next | started", "ds", ds)
 	if ds.data == nil {
 		var err error
 		if ds.data, err = ds.open(ctx); err != nil {
@@ -81,37 +81,39 @@ func (ds *BlobDataSource) Next(ctx context.Context) (eth.Data, error) {
 func (ds *BlobDataSource) open(ctx context.Context) ([]blobOrCalldata, error) {
 	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | started", "ref", ds.ref, "ds.ref.Hash", ds.ref.Hash)
 	_, txs, err := ds.fetcher.InfoAndTxsByHash(ctx, ds.ref.Hash)
-	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | 1", "txs", txs, "err", err)
 	if err != nil {
 		if errors.Is(err, ethereum.NotFound) {
+			ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | stopped, failed to open blob data source, ethereum.NotFound", "err", err)
 			return nil, NewResetError(fmt.Errorf("failed to open blob data source: %w", err))
 		}
+		ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | stopped, failed to open blob data source", "err", err)
 		return nil, NewTemporaryError(fmt.Errorf("failed to open blob data source: %w", err))
 	}
 
 	data, hashes := dataAndHashesFromTxs(txs, &ds.dsCfg, ds.batcherAddr, ds.log)
-	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | 2", "data", data, "hashes", hashes)
 	if len(hashes) == 0 {
+		ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | stopped, there are no blobs to fetch", "data", data)
 		// there are no blobs to fetch so we can return immediately
 		return data, nil
 	}
 
 	// download the actual blob bodies corresponding to the indexed blob hashes
 	blobs, err := ds.blobsFetcher.GetBlobs(ctx, ds.ref, hashes)
-	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | 3", "blobs", blobs, "err", err)
 	if errors.Is(err, ethereum.NotFound) {
+		ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | stopped, failed to fetch blobs, ethereum.NotFound", "err", err)
 		// If the L1 block was available, then the blobs should be available too. The only
 		// exception is if the blob retention window has expired, which we will ultimately handle
 		// by failing over to a blob archival service.
 		return nil, NewResetError(fmt.Errorf("failed to fetch blobs: %w", err))
 	} else if err != nil {
+		ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | stopped, failed to fetch blobs", "err", err)
 		return nil, NewTemporaryError(fmt.Errorf("failed to fetch blobs: %w", err))
 	}
 
 	// go back over the data array and populate the blob pointers
 	if err := fillBlobPointers(data, blobs); err != nil {
 		// this shouldn't happen unless there is a bug in the blobs fetcher
-		ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | 4", "err", err)
+		ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | stopped, failed to fill blob pointers", "err", err)
 		return nil, NewResetError(fmt.Errorf("failed to fill blob pointers: %w", err))
 	}
 	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | finished", "data", data)
@@ -128,25 +130,24 @@ func dataAndHashesFromTxs(txs types.Transactions, config *DataSourceConfig, batc
 	blobIndex := 0 // index of each blob in the block's blob sidecar
 	for _, tx := range txs {
 		// skip any non-batcher transactions
-		log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | 1 started for ", "tx", tx)
+		log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | started for", "tx", tx)
 		if !isValidBatchTx(tx, config.l1Signer, config.batchInboxAddress, batcherAddr) {
+			log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | tx is not valid", "tx", tx)
 			blobIndex += len(tx.BlobHashes())
 			continue
 		}
-		log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | 2 tx is valid ", "tx", tx)
 		// handle non-blob batcher transactions by extracting their calldata
 		if tx.Type() != types.BlobTxType {
+			log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | tx is not of valid blob type", "tx", tx)
 			calldata := eth.Data(tx.Data())
 			data = append(data, blobOrCalldata{nil, &calldata})
 			continue
 		}
-		log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | 3 tx is of valid blob type ", "tx", tx)
 		// handle blob batcher transactions by extracting their blob hashes, ignoring any calldata.
 		if len(tx.Data()) > 0 {
 			log.Warn("blob tx has calldata, which will be ignored", "txhash", tx.Hash())
-			log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | 3.5 tx has calldata ", "tx", tx, "tx.Data()", tx.Data())
+			log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | tx has calldata, which will be ignored", "tx", tx)
 		}
-		log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | 4 tx started checking BlobHashes ", "tx", tx, "tx.BlobHashes()", tx.BlobHashes())
 		for _, h := range tx.BlobHashes() {
 			idh := eth.IndexedBlobHash{
 				Index: uint64(blobIndex),
@@ -156,7 +157,9 @@ func dataAndHashesFromTxs(txs types.Transactions, config *DataSourceConfig, batc
 			data = append(data, blobOrCalldata{nil, nil}) // will fill in blob pointers after we download them below
 			blobIndex += 1
 		}
+		log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | finished for", "tx", tx)
 	}
+	log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | finished", "data", data, "hashes", hashes)
 	return data, hashes
 }
 
