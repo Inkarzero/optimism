@@ -79,14 +79,14 @@ func NewState(log log.Logger, m Metricer, cfg Config) *State {
 // ClearCommitments removes all tracked commitments but not challenges.
 // This should be used to retain the challenge state when performing a L2 reorg
 func (s *State) ClearCommitments() {
-	s.log.Debug("optimism/op-alt-da/dastate.go | ClearCommitments | ", "len(s.commitments)", len(s.commitments), "len(s.expiredCommitments)", len(s.expiredCommitments))
+	s.log.Debug("optimism/op-alt-da/dastate.go | ClearCommitments | started", "len(s.commitments)", len(s.commitments), "len(s.expiredCommitments)", len(s.expiredCommitments))
 	s.commitments = s.commitments[:0]
 	s.expiredCommitments = s.expiredCommitments[:0]
 }
 
 // Reset clears the state. It should be used when a L1 reorg occurs.
 func (s *State) Reset() {
-	s.log.Debug("optimism/op-alt-da/dastate.go | Reset | ", "len(s.commitments)", len(s.commitments), "len(s.expiredCommitments)", len(s.expiredCommitments), "len(s.challenges)", len(s.challenges), "len(s.expiredChallenges)", len(s.expiredChallenges))
+	s.log.Debug("optimism/op-alt-da/dastate.go | Reset | started", "len(s.commitments)", len(s.commitments), "len(s.expiredCommitments)", len(s.expiredCommitments), "len(s.challenges)", len(s.challenges), "len(s.expiredChallenges)", len(s.expiredChallenges))
 	s.commitments = s.commitments[:0]
 	s.expiredCommitments = s.expiredCommitments[:0]
 	s.challenges = s.challenges[:0]
@@ -97,7 +97,7 @@ func (s *State) Reset() {
 // CreateChallenge creates & tracks a challenge. It will overwrite earlier challenges if the
 // same commitment is challenged again.
 func (s *State) CreateChallenge(comm CommitmentData, inclusionBlock eth.BlockID, commBlockNumber uint64) {
-	s.log.Debug("optimism/op-alt-da/dastate.go | CreateChallenge | ", "comm", comm, "inclusionBlock", inclusionBlock, "commBlockNumber", commBlockNumber)
+	s.log.Debug("optimism/op-alt-da/dastate.go | CreateChallenge | started", "comm", comm, "inclusionBlock", inclusionBlock, "commBlockNumber", commBlockNumber)
 	c := &Challenge{
 		commData:                 comm,
 		commInclusionBlockNumber: commBlockNumber,
@@ -110,19 +110,21 @@ func (s *State) CreateChallenge(comm CommitmentData, inclusionBlock eth.BlockID,
 
 // ResolveChallenge marks a challenge as resolved. It will return an error if there was not a corresponding challenge.
 func (s *State) ResolveChallenge(comm CommitmentData, inclusionBlock eth.BlockID, commBlockNumber uint64, input []byte) error {
-	s.log.Debug("optimism/op-alt-da/dastate.go | ResolveChallenge | ", "comm", comm, "inclusionBlock", inclusionBlock, "commBlockNumber", commBlockNumber, "input", input)
+	s.log.Debug("optimism/op-alt-da/dastate.go | ResolveChallenge | started", "comm", comm, "inclusionBlock", inclusionBlock, "commBlockNumber", commBlockNumber, "input", input)
 	c, ok := s.challengesMap[challengeKey(comm, commBlockNumber)]
 	if !ok {
+		s.log.Debug("optimism/op-alt-da/dastate.go | ResolveChallenge | stopped, challenge was not tracked")
 		return errors.New("challenge was not tracked")
 	}
 	c.input = input
 	c.challengeStatus = ChallengeResolved
+	s.log.Debug("optimism/op-alt-da/dastate.go | ResolveChallenge | finished, challenge resolved")
 	return nil
 }
 
 // TrackCommitment stores a commitment in the State
 func (s *State) TrackCommitment(comm CommitmentData, inclusionBlock eth.L1BlockRef) {
-	s.log.Debug("optimism/op-alt-da/dastate.go | TrackCommitment | ", "comm", comm, "inclusionBlock", inclusionBlock)
+	s.log.Debug("optimism/op-alt-da/dastate.go | TrackCommitment | started", "comm", comm, "inclusionBlock", inclusionBlock)
 	c := Commitment{
 		data:               comm,
 		inclusionBlock:     inclusionBlock,
@@ -133,24 +135,27 @@ func (s *State) TrackCommitment(comm CommitmentData, inclusionBlock eth.L1BlockR
 
 // GetChallenge looks up a challenge against commitment + inclusion block.
 func (s *State) GetChallenge(comm CommitmentData, commBlockNumber uint64) (*Challenge, bool) {
-	s.log.Debug("optimism/op-alt-da/dastate.go | GetChallenge | ", "comm", comm, "commBlockNumber", commBlockNumber)
+	s.log.Debug("optimism/op-alt-da/dastate.go | GetChallenge | started", "comm", comm, "commBlockNumber", commBlockNumber)
 	challenge, ok := s.challengesMap[challengeKey(comm, commBlockNumber)]
+	s.log.Debug("optimism/op-alt-da/dastate.go | GetChallenge | finished", "challenge", challenge, "ok", ok)
 	return challenge, ok
 }
 
 // GetChallengeStatus looks up a challenge's status, or returns ChallengeUninitialized if there is no challenge.
 func (s *State) GetChallengeStatus(comm CommitmentData, commBlockNumber uint64) ChallengeStatus {
-	s.log.Debug("optimism/op-alt-da/dastate.go | GetChallengeStatus | ", "comm", comm, "commBlockNumber", commBlockNumber)
+	s.log.Debug("optimism/op-alt-da/dastate.go | GetChallengeStatus | started", "comm", comm, "commBlockNumber", commBlockNumber)
 	challenge, ok := s.GetChallenge(comm, commBlockNumber)
 	if ok {
+		s.log.Debug("optimism/op-alt-da/dastate.go | GetChallengeStatus | finished, ok", "challenge", challenge)
 		return challenge.challengeStatus
 	}
+	s.log.Debug("optimism/op-alt-da/dastate.go | GetChallengeStatus | finished, not ok", "challenge", challenge)
 	return ChallengeUninitialized
 }
 
 // NoCommitments returns true iff it is not tracking any commitments or challenges.
 func (s *State) NoCommitments() bool {
-	s.log.Debug("optimism/op-alt-da/dastate.go | NoCommitments | ", "len(s.challenges)", len(s.challenges), "len(s.expiredChallenges)", len(s.expiredChallenges), "len(s.commitments)", len(s.commitments), "len(s.expiredCommitments)", len(s.expiredCommitments))
+	s.log.Debug("optimism/op-alt-da/dastate.go | NoCommitments | started", "len(s.challenges)", len(s.challenges), "len(s.expiredChallenges)", len(s.expiredChallenges), "len(s.commitments)", len(s.commitments), "len(s.expiredCommitments)", len(s.expiredCommitments))
 	return len(s.challenges) == 0 && len(s.expiredChallenges) == 0 && len(s.commitments) == 0 && len(s.expiredCommitments) == 0
 }
 
@@ -159,7 +164,7 @@ func (s *State) NoCommitments() bool {
 // This function processess commitments in order of inclusion until it finds a commitment which has not expired.
 // If a commitment expires which did not resolve its challenge, it returns ErrReorgRequired to indicate that a L2 reorg should be performed.
 func (s *State) ExpireCommitments(origin eth.BlockID) error {
-	s.log.Debug("optimism/op-alt-da/dastate.go | ExpireCommitments | ", "origin", origin, "len(s.commitments)", len(s.commitments))
+	s.log.Debug("optimism/op-alt-da/dastate.go | ExpireCommitments | started", "origin", origin, "len(s.commitments)", len(s.commitments))
 	var err error
 	for len(s.commitments) > 0 {
 		c := s.commitments[0]
@@ -174,6 +179,7 @@ func (s *State) ExpireCommitments(origin eth.BlockID) error {
 
 		// If the commitment expires the in future, return early
 		if expiresAt > origin.Number {
+			s.log.Debug("optimism/op-alt-da/dastate.go | ExpireCommitments | stopped, commitment expires the in future", "expiresAt", expiresAt, "origin.Number", origin.Number)
 			return err
 		}
 
@@ -187,6 +193,7 @@ func (s *State) ExpireCommitments(origin eth.BlockID) error {
 			err = ErrReorgRequired
 		}
 	}
+	s.log.Debug("optimism/op-alt-da/dastate.go | ExpireCommitments | finished", "err", err)
 	return err
 }
 
@@ -195,7 +202,7 @@ func (s *State) ExpireCommitments(origin eth.BlockID) error {
 // This function processess challenges in order of inclusion until it finds a commitment which has not expired.
 // This function must be called for every block because there is no contract event to expire challenges.
 func (s *State) ExpireChallenges(origin eth.BlockID) {
-	s.log.Debug("optimism/op-alt-da/dastate.go | ExpireChallenges | ", "origin", origin, "len(s.challenges)", len(s.challenges))
+	s.log.Debug("optimism/op-alt-da/dastate.go | ExpireChallenges | started", "origin", origin, "len(s.challenges)", len(s.challenges))
 	for len(s.challenges) > 0 {
 		c := s.challenges[0]
 
@@ -218,7 +225,7 @@ func (s *State) ExpireChallenges(origin eth.BlockID) {
 
 // Prune removes challenges & commitments which have an expiry block number beyond the given block number.
 func (s *State) Prune(origin eth.BlockID) {
-	s.log.Debug("optimism/op-alt-da/dastate.go | Prune | ", "origin", origin)
+	s.log.Debug("optimism/op-alt-da/dastate.go | Prune | started", "origin", origin)
 	// Commitments rely on challenges, so we prune commitments first.
 	s.pruneCommitments(origin)
 	s.pruneChallenges(origin)
@@ -227,7 +234,7 @@ func (s *State) Prune(origin eth.BlockID) {
 // pruneCommitments removes commitments which have are beyond a given block number.
 // It will remove commitments in order of inclusion until it finds a commitment which is not beyond the given block number.
 func (s *State) pruneCommitments(origin eth.BlockID) {
-	s.log.Debug("optimism/op-alt-da/dastate.go | pruneCommitments | ", "origin", origin, "len(s.expiredCommitments)", len(s.expiredCommitments), "s.expiredCommitments", s.expiredCommitments)
+	s.log.Debug("optimism/op-alt-da/dastate.go | pruneCommitments | started", "origin", origin, "len(s.expiredCommitments)", len(s.expiredCommitments), "s.expiredCommitments", s.expiredCommitments)
 	for len(s.expiredCommitments) > 0 {
 		c := s.expiredCommitments[0]
 		challenge, ok := s.GetChallenge(c.data, c.inclusionBlock.Number)
@@ -249,6 +256,7 @@ func (s *State) pruneCommitments(origin eth.BlockID) {
 
 		// Record the latest inclusion block to be returned
 		s.lastPrunedCommitment = c.inclusionBlock
+		s.log.Debug("optimism/op-alt-da/dastate.go | pruneCommitments | finished", "s.lastPrunedCommitment", s.lastPrunedCommitment)
 	}
 }
 
