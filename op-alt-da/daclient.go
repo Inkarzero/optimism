@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-
-	"github.com/ethereum/go-ethereum/log"
 )
 
 // ErrNotFound is returned when the server could not find the input.
@@ -33,14 +31,11 @@ func NewDAClient(url string, verify bool, pc bool) *DAClient {
 
 // GetInput returns the input data for the given encoded commitment bytes.
 func (c *DAClient) GetInput(ctx context.Context, comm CommitmentData) ([]byte, error) {
-	log.Debug("optimism/op-alt-da/daclient.go | GetInput | ", "comm", comm)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/get/0x%x", c.url, comm.Encode()), nil)
-	log.Debug("optimism/op-alt-da/daclient.go | GetInput | ", "req", req, "err", err)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
 	}
 	resp, err := http.DefaultClient.Do(req)
-	log.Debug("optimism/op-alt-da/daclient.go | GetInput | ", "resp", resp, "err", err)
 	if err != nil {
 		return nil, err
 	}
@@ -52,18 +47,15 @@ func (c *DAClient) GetInput(ctx context.Context, comm CommitmentData) ([]byte, e
 	}
 	defer resp.Body.Close()
 	input, err := io.ReadAll(resp.Body)
-	log.Debug("optimism/op-alt-da/daclient.go | GetInput | ", "input", input, "err", err)
 	if err != nil {
 		return nil, err
 	}
-	log.Debug("optimism/op-alt-da/daclient.go | GetInput | start verify")
 	if c.verify {
 		if err := comm.Verify(input); err != nil {
 			return nil, err
 		}
 
 	}
-	log.Debug("optimism/op-alt-da/daclient.go | GetInput | end verify", "input", input)
 	return input, nil
 }
 
