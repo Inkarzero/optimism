@@ -241,8 +241,9 @@ func (bq *BatchQueue) AddBatch(ctx context.Context, batch Batch, parent eth.L2Bl
 // based on currently available buffered batch and L1 origin information.
 // If no batch can be derived yet, then (nil, io.EOF) is returned.
 func (bq *BatchQueue) deriveNextBatch(ctx context.Context, outOfData bool, parent eth.L2BlockRef) (Batch, error) {
-	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | 1 ", "parent", parent, "outOfData", outOfData)
+	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | started", "parent", parent, "outOfData", outOfData)
 	if len(bq.l1Blocks) == 0 {
+		bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | stopped, no origin was prepared")
 		return nil, NewCriticalError(errors.New("cannot derive next batch, no origin was prepared"))
 	}
 	epoch := bq.l1Blocks[0]
@@ -252,6 +253,7 @@ func (bq *BatchQueue) deriveNextBatch(ctx context.Context, outOfData bool, paren
 	// This is in the case where we auto generate all batches in an epoch & advance the epoch
 	// but don't advance the L2 Safe Head's epoch
 	if parent.L1Origin != epoch.ID() && parent.L1Origin.Number != epoch.Number-1 {
+		bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | stopped, buffered L1 chain epoch does not match safe head origin", "epoch", epoch, "parent", parent)
 		return nil, NewResetError(fmt.Errorf("buffered L1 chain epoch %s in batch queue does not match safe head origin %s", epoch, parent.L1Origin))
 	}
 
@@ -267,7 +269,7 @@ func (bq *BatchQueue) deriveNextBatch(ctx context.Context, outOfData bool, paren
 batchLoop:
 	for i, batch := range bq.batches {
 		validity := CheckBatch(ctx, bq.config, bq.log.New("batch_index", i), bq.l1Blocks, parent, batch, bq.l2)
-		bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | 2 CheckBatch", "validity", validity)
+		bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | CheckBatch", "validity", validity)
 		switch validity {
 		case BatchFuture:
 			remaining = append(remaining, batch)
@@ -293,12 +295,12 @@ batchLoop:
 		}
 	}
 	bq.batches = remaining
-	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | 3 ", "nextBatch", nextBatch)
 	if nextBatch != nil {
+		bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | found next batch", "epoch", epoch, "parent", parent, "outOfData", outOfData)
 		nextBatch.Batch.LogContext(bq.log).Info("Found next batch")
 		return nextBatch.Batch, nil
 	}
-	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | 4 ", "epoch", epoch, "parent", parent, "outOfData", outOfData)
+	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | no next batch", "epoch", epoch, "parent", parent, "outOfData", outOfData)
 	// If the current epoch is too old compared to the L1 block we are at,
 	// i.e. if the sequence window expired, we create empty batches for the current epoch
 	expiryEpoch := epoch.Number + bq.config.SeqWindowSize
@@ -308,25 +310,26 @@ batchLoop:
 	bq.log.Trace("Potentially generating an empty batch",
 		"expiryEpoch", expiryEpoch, "forceEmptyBatches", forceEmptyBatches, "nextTimestamp", nextTimestamp,
 		"epoch_time", epoch.Time, "len_l1_blocks", len(bq.l1Blocks), "firstOfEpoch", firstOfEpoch)
-	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | 5 ", "epoch", epoch, "parent", parent, "outOfData", outOfData,
+	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | Potentially generating an empty batch", "epoch", epoch, "parent", parent, "outOfData", outOfData,
 		"forceEmptyBatches", forceEmptyBatches, "firstOfEpoch", firstOfEpoch)
 	if !forceEmptyBatches {
 		// sequence window did not expire yet, still room to receive batches for the current epoch,
 		// no need to force-create empty batch(es) towards the next epoch yet.
+		bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | stopped, no need to force-create empty batch(es) towards the next epoch yet")
 		return nil, io.EOF
 	}
-	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | 6 ")
+
 	if len(bq.l1Blocks) < 2 {
+		bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | stopped, need next L1 block to proceed towards")
 		// need next L1 block to proceed towards
 		return nil, io.EOF
 	}
-	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | 7 ")
 	nextEpoch := bq.l1Blocks[1]
 	// Fill with empty L2 blocks of the same epoch until we meet the time of the next L1 origin,
 	// to preserve that L2 time >= L1 time. If this is the first block of the epoch, always generate a
 	// batch to ensure that we at least have one batch per epoch.
-	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | 8 ")
 	if nextTimestamp < nextEpoch.Time || firstOfEpoch {
+		bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | generating next batch", "epoch", epoch, "timestamp", nextTimestamp)
 		bq.log.Info("Generating next batch", "epoch", epoch, "timestamp", nextTimestamp)
 		return &SingularBatch{
 			ParentHash:   parent.Hash,
@@ -336,12 +339,11 @@ batchLoop:
 			Transactions: nil,
 		}, nil
 	}
-	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | 9 ")
 
 	// At this point we have auto generated every batch for the current epoch
 	// that we can, so we can advance to the next epoch.
 	bq.log.Trace("Advancing internal L1 blocks", "next_timestamp", nextTimestamp, "next_epoch_time", nextEpoch.Time)
 	bq.l1Blocks = bq.l1Blocks[1:]
-	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | 10 ")
+	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | finished, advancing internal L1 blocks", "next_timestamp", nextTimestamp, "next_epoch_time", nextEpoch.Time)
 	return nil, io.EOF
 }
