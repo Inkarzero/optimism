@@ -132,9 +132,12 @@ func (p *SimpleAsyncGossiper) Start() {
 // it is called by the Start loop when a new payload is set
 // the payload is only stored if the publish is successful
 func (p *SimpleAsyncGossiper) gossip(ctx context.Context, payload *eth.ExecutionPayloadEnvelope) {
+	p.log.Debug("op-node/rollup/async/asyncgossiper.go | gossip | started", "payload", payload)
 	if err := p.net.PublishL2Payload(ctx, payload); err == nil {
 		p.currentPayload = payload
+		p.log.Debug("op-node/rollup/async/asyncgossiper.go | gossip | published", "payload", payload)
 	} else {
+		p.log.Debug("op-node/rollup/async/asyncgossiper.go | gossip | failed to publish", "payload", payload, "err", err)
 		p.log.Warn("failed to publish newly created block",
 			"id", payload.ExecutionPayload.ID(),
 			"hash", payload.ExecutionPayload.BlockHash,

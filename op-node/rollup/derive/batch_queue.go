@@ -93,18 +93,22 @@ func (bq *BatchQueue) popNextBatch(parent eth.L2BlockRef) *SingularBatch {
 // NextBatch return next valid batch upon the given safe head.
 // It also returns the boolean that indicates if the batch is the last block in the batch.
 func (bq *BatchQueue) NextBatch(ctx context.Context, parent eth.L2BlockRef) (*SingularBatch, bool, error) {
+	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | NextBatch | started", "parent", parent, "bq", bq)
 	if len(bq.nextSpan) > 0 {
 		// There are cached singular batches derived from the span batch.
 		// Check if the next cached batch matches the given parent block.
+		bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | NextBatch | cached singular batches derived from the span batch", "parent", parent, "nextSpan", bq.nextSpan)
 		if bq.nextSpan[0].Timestamp == parent.Time+bq.config.BlockTime {
 			// Pop first one and return.
 			nextBatch := bq.popNextBatch(parent)
 			// len(bq.nextSpan) == 0 means it's the last batch of the span.
+			bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | NextBatch | finished, return next batch", "parent", parent, "nextBatch", nextBatch)
 			return nextBatch, len(bq.nextSpan) == 0, nil
 		} else {
 			// Given parent block does not match the next batch. It means the previously returned batch is invalid.
 			// Drop cached batches and find another batch.
 			bq.log.Warn("parent block does not match the next batch. dropped cached batches", "parent", parent.ID(), "nextBatchTime", bq.nextSpan[0].GetTimestamp())
+			bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | NextBatch | skipping, parent block does not match the next batch. dropped cached batche", "bq.nextSpan[0].Timestamp", bq.nextSpan[0].Timestamp, "parent", parent, "bq.config.BlockTime", bq.config.BlockTime)
 			bq.nextSpan = bq.nextSpan[:0]
 		}
 	}
@@ -310,8 +314,14 @@ batchLoop:
 	bq.log.Trace("Potentially generating an empty batch",
 		"expiryEpoch", expiryEpoch, "forceEmptyBatches", forceEmptyBatches, "nextTimestamp", nextTimestamp,
 		"epoch_time", epoch.Time, "len_l1_blocks", len(bq.l1Blocks), "firstOfEpoch", firstOfEpoch)
-	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | Potentially generating an empty batch", "epoch", epoch, "parent", parent, "outOfData", outOfData,
-		"forceEmptyBatches", forceEmptyBatches, "firstOfEpoch", firstOfEpoch)
+	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | deriveNextBatch | Potentially generating an empty batch",
+		"forceEmptyBatches", forceEmptyBatches,
+		"expiryEpoch", expiryEpoch,
+		"bq.origin", bq.origin,
+		"outOfData", outOfData,
+		"epoch", epoch,
+		"parent", parent,
+		"firstOfEpoch", firstOfEpoch)
 	if !forceEmptyBatches {
 		// sequence window did not expire yet, still room to receive batches for the current epoch,
 		// no need to force-create empty batch(es) towards the next epoch yet.

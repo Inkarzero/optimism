@@ -523,6 +523,7 @@ func (p *publisher) BlocksTopicV3Peers() []peer.ID {
 }
 
 func (p *publisher) PublishL2Payload(ctx context.Context, envelope *eth.ExecutionPayloadEnvelope, signer Signer) error {
+	return fmt.Errorf("op-node/p2p/gossip.go | test error")
 	res := msgBufPool.Get().(*[]byte)
 	buf := bytes.NewBuffer((*res)[:0])
 	defer func() {
