@@ -108,7 +108,11 @@ func (bq *BatchQueue) NextBatch(ctx context.Context, parent eth.L2BlockRef) (*Si
 			// Given parent block does not match the next batch. It means the previously returned batch is invalid.
 			// Drop cached batches and find another batch.
 			bq.log.Warn("parent block does not match the next batch. dropped cached batches", "parent", parent.ID(), "nextBatchTime", bq.nextSpan[0].GetTimestamp())
-			bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | NextBatch | skipping, parent block does not match the next batch. dropped cached batche", "bq.nextSpan[0].Timestamp", bq.nextSpan[0].Timestamp, "parent", parent, "bq.config.BlockTime", bq.config.BlockTime)
+			bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | NextBatch | skipping, parent block does not match the next batch",
+				"bq.nextSpan[0].Timestamp", bq.nextSpan[0].Timestamp,
+				"parent", parent,
+				"bq.config.BlockTime", bq.config.BlockTime,
+				"bq.nextSpan", bq.nextSpan)
 			bq.nextSpan = bq.nextSpan[:0]
 		}
 	}
@@ -117,6 +121,7 @@ func (bq *BatchQueue) NextBatch(ctx context.Context, parent eth.L2BlockRef) (*Si
 	// Advancing epoch must be done after the pipeline successfully apply the entire span batch to the chain.
 	// Because the span batch can be reverted during processing the batch, then we must preserve existing l1Blocks
 	// to verify the epochs of the next candidate batch.
+	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | NextBatch | no cached singular batches derived from the span batch", "parent", parent, "bq.l1Blocks", bq.l1Blocks)
 	if len(bq.l1Blocks) > 0 && parent.L1Origin.Number > bq.l1Blocks[0].Number {
 		for i, l1Block := range bq.l1Blocks {
 			if parent.L1Origin.Number == l1Block.Number {
@@ -321,7 +326,8 @@ batchLoop:
 		"outOfData", outOfData,
 		"epoch", epoch,
 		"parent", parent,
-		"firstOfEpoch", firstOfEpoch)
+		"firstOfEpoch", firstOfEpoch,
+		"bq.config.SeqWindowSize", bq.config.SeqWindowSize)
 	if !forceEmptyBatches {
 		// sequence window did not expire yet, still room to receive batches for the current epoch,
 		// no need to force-create empty batch(es) towards the next epoch yet.
