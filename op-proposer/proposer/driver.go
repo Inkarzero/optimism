@@ -426,7 +426,9 @@ func (l *L2OutputSubmitter) sendTransaction(ctx context.Context, output *eth.Out
 		l.Log.Info("Proposer tx successfully published",
 			"tx_hash", receipt.TxHash,
 			"l1blocknum", output.Status.CurrentL1.Number,
-			"l1blockhash", output.Status.CurrentL1.Hash)
+			"l1blockhash", output.Status.CurrentL1.Hash,
+			"l2blocknum", output.BlockRef.Number,
+			"l2blockhash", output.BlockRef.Hash)
 	}
 	return nil
 }
@@ -502,7 +504,9 @@ func (l *L2OutputSubmitter) proposeOutput(ctx context.Context, output *eth.Outpu
 			"err", err,
 			"l1blocknum", output.Status.CurrentL1.Number,
 			"l1blockhash", output.Status.CurrentL1.Hash,
-			"l1head", output.Status.HeadL1.Number)
+			"l1head", output.Status.HeadL1.Number,
+			"l2blocknum", output.BlockRef.Number,
+			"l2blockhash", output.BlockRef.Hash)
 		return
 	}
 	l.Metr.RecordL2BlocksProposed(output.BlockRef)
