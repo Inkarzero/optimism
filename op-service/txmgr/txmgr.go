@@ -235,7 +235,7 @@ func (m *SimpleTxManager) Send(ctx context.Context, candidate TxCandidate) (*typ
 
 // send performs the actual transaction creation and sending.
 func (m *SimpleTxManager) send(ctx context.Context, candidate TxCandidate) (*types.Receipt, error) {
-	m.l.Debug("/txmgr/SimpleTxManager.go | send | sending transaction", "blobs", len(candidate.Blobs), "calldata_size", len(candidate.TxData))
+	m.l.Debug("/txmgr/SimpleTxManager.go | send | sending transaction", "blobs", len(candidate.Blobs), "calldata_size", len(candidate.TxData), "ctx", ctx, "candidate", candidate)
 	if m.cfg.TxSendTimeout != 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, m.cfg.TxSendTimeout)

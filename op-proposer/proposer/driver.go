@@ -393,7 +393,13 @@ func (l *L2OutputSubmitter) sendTransaction(ctx context.Context, output *eth.Out
 	if err != nil {
 		return err
 	}
-
+	l.Log.Debug("/op-proposer/proposer/driver.go | sendTransaction | proposing output root",
+		"output", output.OutputRoot,
+		"block", output.BlockRef,
+		"l1blocknum", output.Status.CurrentL1.Number,
+		"l1blockhash", output.Status.CurrentL1.Hash,
+		"l2blocknum", output.BlockRef.Number,
+		"l2blockhash", output.BlockRef.Hash)
 	l.Log.Info("Proposing output root", "output", output.OutputRoot, "block", output.BlockRef)
 	var receipt *types.Receipt
 	if l.Cfg.DisputeGameFactoryAddr != nil {
