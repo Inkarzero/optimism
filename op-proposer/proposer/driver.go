@@ -218,6 +218,7 @@ func (l *L2OutputSubmitter) StopL2OutputSubmitting() error {
 // The passed context is expected to be a lifecycle context. A network timeout
 // context will be derived from it.
 func (l *L2OutputSubmitter) FetchL2OOOutput(ctx context.Context) (*eth.OutputResponse, bool, error) {
+	l.Log.Debug("/op-proposer/proposer/driver.go | FetchL2OOOutput | started")
 	if l.l2ooContract == nil {
 		return nil, false, fmt.Errorf("L2OutputOracle contract not set, cannot fetch next output info")
 	}
@@ -229,6 +230,7 @@ func (l *L2OutputSubmitter) FetchL2OOOutput(ctx context.Context) (*eth.OutputRes
 		Context: cCtx,
 	}
 	nextCheckpointBlockBig, err := l.l2ooContract.NextBlockNumber(callOpts)
+	l.Log.Debug("/op-proposer/proposer/driver.go | FetchL2OOOutput | nextCheckpointBlockBig", "nextCheckpointBlockBig", nextCheckpointBlockBig)
 	if err != nil {
 		return nil, false, fmt.Errorf("querying next block number: %w", err)
 	}
@@ -238,6 +240,7 @@ func (l *L2OutputSubmitter) FetchL2OOOutput(ctx context.Context) (*eth.OutputRes
 	if err != nil {
 		return nil, false, err
 	}
+	l.Log.Debug("/op-proposer/proposer/driver.go | FetchL2OOOutput | currentBlockNumber", "currentBlockNumber", currentBlockNumber)
 
 	// Ensure that we do not submit a block in the future
 	if currentBlockNumber < nextCheckpointBlock {
@@ -249,6 +252,7 @@ func (l *L2OutputSubmitter) FetchL2OOOutput(ctx context.Context) (*eth.OutputRes
 	if err != nil {
 		return nil, false, fmt.Errorf("fetching output: %w", err)
 	}
+	l.Log.Debug("/op-proposer/proposer/driver.go | FetchL2OOOutput | output", "output", output)
 
 	// Always propose if it's part of the Finalized L2 chain. Or if allowed, if it's part of the safe L2 chain.
 	if output.BlockRef.Number > output.Status.FinalizedL2.Number && (!l.Cfg.AllowNonFinalized || output.BlockRef.Number > output.Status.SafeL2.Number) {
