@@ -421,6 +421,9 @@ func (l *L2OutputSubmitter) sendTransaction(ctx context.Context, output *eth.Out
 			return err
 		}
 	} else {
+		if output.Status.HeadL1.Number-output.Status.CurrentL1.Number > 256 {
+			l.Log.Debug("/op-proposer/proposer/driver.go | sendTransaction | L1 blockhash will be overriden by 0", "l1blocknum", output.Status.CurrentL1.Number)
+		}
 		data, err := l.ProposeL2OutputTxData(output)
 		if err != nil {
 			return err
