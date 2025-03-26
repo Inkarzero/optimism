@@ -241,18 +241,27 @@ func (m *SimpleTxManager) send(ctx context.Context, candidate TxCandidate) (*typ
 		ctx, cancel = context.WithTimeout(ctx, m.cfg.TxSendTimeout)
 		defer cancel()
 	}
+	var criticalError error
 	tx, err := retry.Do(ctx, 30, retry.Fixed(2*time.Second), func() (*types.Transaction, error) {
 		if m.closed.Load() {
 			return nil, ErrClosed
 		}
 		tx, err := m.craftTx(ctx, candidate)
 		if err != nil {
+			if strings.Contains(err.Error(), "failed to estimate gas: execution reverted: L2OutputOracle: block hash does not match the hash at the expected height") {
+				m.l.Warn("Critical error encountered, stopping retries", "err", err)
+				criticalError = err
+				return nil, nil // Prevent retrying
+			}
 			m.l.Warn("Failed to create a transaction, will retry", "err", err)
 		}
 		return tx, err
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create the tx: %w", err)
+	}
+	if criticalError != nil {
+		return nil, fmt.Errorf("failed to create the tx: %w", criticalError)
 	}
 	return m.sendTx(ctx, tx)
 }
