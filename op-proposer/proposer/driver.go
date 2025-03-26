@@ -349,11 +349,16 @@ func (l *L2OutputSubmitter) ProposeL2OutputTxData(output *eth.OutputResponse) ([
 
 // proposeL2OutputTxData creates the transaction data for the ProposeL2Output function
 func proposeL2OutputTxData(abi *abi.ABI, output *eth.OutputResponse) ([]byte, error) {
+	var L1BlockHash = output.Status.CurrentL1.Hash
+	if output.Status.HeadL1.Number-output.Status.CurrentL1.Number > 256 {
+		//set L1BlockHash to 0 if the L1 block is too old
+		L1BlockHash = common.Hash{}
+	}
 	return abi.Pack(
 		"proposeL2Output",
 		output.OutputRoot,
 		new(big.Int).SetUint64(output.BlockRef.Number),
-		output.Status.CurrentL1.Hash,
+		L1BlockHash,
 		new(big.Int).SetUint64(output.Status.CurrentL1.Number))
 }
 
