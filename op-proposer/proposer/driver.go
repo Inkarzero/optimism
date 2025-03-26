@@ -252,7 +252,7 @@ func (l *L2OutputSubmitter) FetchL2OOOutput(ctx context.Context) (*eth.OutputRes
 	if err != nil {
 		return nil, false, fmt.Errorf("fetching output: %w", err)
 	}
-	l.Log.Debug("/op-proposer/proposer/driver.go | FetchL2OOOutput | output", "output", output)
+	l.Log.Debug("/op-proposer/proposer/driver.go | FetchL2OOOutput | output", "output", output, "L1_block", output.Status.CurrentL1)
 
 	// Always propose if it's part of the Finalized L2 chain. Or if allowed, if it's part of the safe L2 chain.
 	if output.BlockRef.Number > output.Status.FinalizedL2.Number && (!l.Cfg.AllowNonFinalized || output.BlockRef.Number > output.Status.SafeL2.Number) {
