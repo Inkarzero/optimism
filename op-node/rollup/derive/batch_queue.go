@@ -93,7 +93,17 @@ func (bq *BatchQueue) popNextBatch(parent eth.L2BlockRef) *SingularBatch {
 // NextBatch return next valid batch upon the given safe head.
 // It also returns the boolean that indicates if the batch is the last block in the batch.
 func (bq *BatchQueue) NextBatch(ctx context.Context, parent eth.L2BlockRef) (*SingularBatch, bool, error) {
-	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | NextBatch | started", "parent", parent, "bq", bq)
+	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | NextBatch | started",
+		"parent", parent,
+		"bq.config", bq.config,
+		"len(bq.l1Blocks)", len(bq.l1Blocks),
+		"oldest_l1_block", bq.l1Blocks[0],
+		"latest_l1_block", bq.l1Blocks[len(bq.l1Blocks)-1],
+		"bq.origin", bq.origin,
+		"len(bq.batches)", len(bq.batches),
+		"oldest_batch", bq.batches[0],
+		"latest_batch", bq.batches[len(bq.batches)-1],
+		"bq.nextSpan", bq.nextSpan)
 	if len(bq.nextSpan) > 0 {
 		// There are cached singular batches derived from the span batch.
 		// Check if the next cached batch matches the given parent block.
