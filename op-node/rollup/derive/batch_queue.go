@@ -97,13 +97,19 @@ func (bq *BatchQueue) NextBatch(ctx context.Context, parent eth.L2BlockRef) (*Si
 		"parent", parent,
 		"bq.config", bq.config,
 		"len(bq.l1Blocks)", len(bq.l1Blocks),
-		"oldest_l1_block", bq.l1Blocks[0],
-		"latest_l1_block", bq.l1Blocks[len(bq.l1Blocks)-1],
 		"bq.origin", bq.origin,
 		"len(bq.batches)", len(bq.batches),
-		"oldest_batch", bq.batches[0],
-		"latest_batch", bq.batches[len(bq.batches)-1],
 		"bq.nextSpan", bq.nextSpan)
+	if len(bq.l1Blocks) > 0 {
+		bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | NextBatch | l1Blocks",
+			"oldest_l1_block", bq.l1Blocks[0],
+			"latest_l1_block", bq.l1Blocks[len(bq.l1Blocks)-1])
+	}
+	if len(bq.batches) > 0 {
+		bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | NextBatch | batches",
+			"oldest_batch", bq.batches[0],
+			"latest_batch", bq.batches[len(bq.batches)-1])
+	}
 	if len(bq.nextSpan) > 0 {
 		// There are cached singular batches derived from the span batch.
 		// Check if the next cached batch matches the given parent block.
