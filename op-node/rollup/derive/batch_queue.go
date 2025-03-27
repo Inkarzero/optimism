@@ -137,7 +137,7 @@ func (bq *BatchQueue) NextBatch(ctx context.Context, parent eth.L2BlockRef) (*Si
 	// Advancing epoch must be done after the pipeline successfully apply the entire span batch to the chain.
 	// Because the span batch can be reverted during processing the batch, then we must preserve existing l1Blocks
 	// to verify the epochs of the next candidate batch.
-	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | NextBatch | no cached singular batches derived from the span batch", "parent", parent, "bq.l1Blocks", bq.l1Blocks)
+	bq.log.Debug("optimism/op-node/rollup/derive/batch_queue.go | NextBatch | no cached singular batches derived from the span batch", "parent", parent, "len(bq.l1Blocks)", len(bq.l1Blocks))
 	if len(bq.l1Blocks) > 0 && parent.L1Origin.Number > bq.l1Blocks[0].Number {
 		for i, l1Block := range bq.l1Blocks {
 			if parent.L1Origin.Number == l1Block.Number {
