@@ -34,7 +34,7 @@ const (
 func CheckBatch(ctx context.Context, cfg *rollup.Config, log log.Logger, l1Blocks []eth.L1BlockRef,
 	l2SafeHead eth.L2BlockRef, batch *BatchWithL1InclusionBlock, l2Fetcher SafeBlockFetcher,
 ) BatchValidity {
-	log.Debug("/op-node/rollup/derive/batches.go | CheckBatch | started", "batch", batch, "batch_type", batch.GetBatchType(), "l1_blocks", l1Blocks, "l2_safe_head", l2SafeHead)
+	log.Debug("/op-node/rollup/derive/batches.go | CheckBatch | started", "batch", batch, "batch_type", batch.GetBatchType(), "len(l1_blocks)", len(l1Blocks), "l2_safe_head", l2SafeHead)
 	switch typ := batch.GetBatchType(); typ {
 	case SingularBatchType:
 		singularBatch, ok := batch.AsSingularBatch()
