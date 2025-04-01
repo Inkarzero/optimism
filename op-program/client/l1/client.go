@@ -78,8 +78,6 @@ func (o *OracleL1Client) FetchReceipts(ctx context.Context, blockHash common.Has
 }
 
 func (o *OracleL1Client) InfoAndTxsByHash(ctx context.Context, hash common.Hash) (eth.BlockInfo, types.Transactions, error) {
-	o.logger.Debug("op-program/client/l1/client.go | InfoAndTxsByHash | started", "hash", hash)
 	info, txs := o.oracle.TransactionsByBlockHash(hash)
-	o.logger.Debug("op-program/client/l1/client.go | InfoAndTxsByHash | finished", "info", info, "txs", txs)
 	return info, txs, nil
 }

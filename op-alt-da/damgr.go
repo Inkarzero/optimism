@@ -115,19 +115,16 @@ func (d *DA) OnFinalizedHeadSignal(f HeadSignalFn) {
 // the finalized head is set to the latest reference pruned in this way.
 // It is called by the Finalize function, as it has an L1 finalized head to use.
 func (d *DA) updateFinalizedHead(l1Finalized eth.L1BlockRef) {
-	d.log.Debug("optimism/op-alt-da/damgr.go | updateFinalizedHead | started", "l1Finalized", l1Finalized)
 	d.l1FinalizedHead = l1Finalized
 	// Prune the state to the finalized head
 	d.state.Prune(l1Finalized.ID())
 	d.finalizedHead = d.state.lastPrunedCommitment
-	d.log.Debug("optimism/op-alt-da/damgr.go | updateFinalizedHead | finished", "finalizedHead", d.finalizedHead)
 }
 
 // updateFinalizedFromL1 updates the finalized head based on the challenge window.
 // it uses the L1 fetcher to get the block reference at the finalized head - challenge window.
 // It is called in AdvanceL1Origin if there are no commitments to finalize, as it has an L1 fetcher to use.
 func (d *DA) updateFinalizedFromL1(ctx context.Context, l1 L1Fetcher) error {
-	d.log.Debug("optimism/op-alt-da/damgr.go | updateFinalizedFromL1 | started", "l1FinalizedHead", d.l1FinalizedHead)
 	// don't update if the finalized head is smaller than the challenge window
 	if d.l1FinalizedHead.Number < d.cfg.ChallengeWindow {
 		d.log.Debug("optimism/op-alt-da/damgr.go | updateFinalizedFromL1 | stopped, finalized head is smaller than the challenge window")
@@ -139,13 +136,11 @@ func (d *DA) updateFinalizedFromL1(ctx context.Context, l1 L1Fetcher) error {
 		return err
 	}
 	d.finalizedHead = ref
-	d.log.Debug("optimism/op-alt-da/damgr.go | updateFinalizedFromL1 | finished", "finalizedHead", d.finalizedHead)
 	return nil
 }
 
 // Finalize sets the L1 finalized head signal and calls the handler function if set.
 func (d *DA) Finalize(l1Finalized eth.L1BlockRef) {
-	d.log.Debug("optimism/op-alt-da/damgr.go | Finalize | started", "l1Finalized", l1Finalized, "d.finalizedHead", d.finalizedHead)
 	d.updateFinalizedHead(l1Finalized)
 	d.metrics.RecordChallengesHead("finalized", d.finalizedHead.Number)
 
@@ -157,7 +152,6 @@ func (d *DA) Finalize(l1Finalized eth.L1BlockRef) {
 	// execute the handler function if set
 	// the handler function is called with the altDA finalized head
 	if d.finalizedHeadSignalHandler == nil {
-		d.log.Debug("optimism/op-alt-da/damgr.go | Finalize | stopped, finalized head signal handler not set")
 		d.log.Warn("finalized head signal handler not set")
 		return
 	}
@@ -168,7 +162,6 @@ func (d *DA) Finalize(l1Finalized eth.L1BlockRef) {
 // It is used when the derivation pipeline stalls due to missing data and we need to continue
 // syncing challenge events until the challenge is resolved or expires.
 func (d *DA) LookAhead(ctx context.Context, l1 L1Fetcher) error {
-	d.log.Debug("optimism/op-alt-da/damgr.go | LookAhead | started", "origin", d.challengeOrigin)
 	blkRef, err := l1.L1BlockRefByNumber(ctx, d.challengeOrigin.Number+1)
 	// temporary error, will do a backoff
 	if err != nil {
@@ -180,7 +173,6 @@ func (d *DA) LookAhead(ctx context.Context, l1 L1Fetcher) error {
 
 // Reset the challenge event derivation origin in case of L1 reorg
 func (d *DA) Reset(ctx context.Context, base eth.L1BlockRef, baseCfg eth.SystemConfig) error {
-	d.log.Debug("optimism/op-alt-da/damgr.go | Reset | started")
 	// resetting due to expired challenge, do not clear state.
 	// If the DA source returns ErrReset, the pipeline is forced to reset by the rollup driver.
 	// In that case the Reset function will be called immediately, BEFORE the pipeline can
@@ -202,7 +194,6 @@ func (d *DA) Reset(ctx context.Context, base eth.L1BlockRef, baseCfg eth.SystemC
 // GetInput returns the input data for the given commitment bytes. blockNumber is required to lookup
 // the challenge status in the DataAvailabilityChallenge L1 contract.
 func (d *DA) GetInput(ctx context.Context, l1 L1Fetcher, comm CommitmentData, blockId eth.L1BlockRef) (eth.Data, error) {
-	d.log.Debug("optimism/op-alt-da/damgr.go | GetInput | started", "comm", comm, "blockId", blockId, "d.cfg.commitmenttype", d.cfg.CommitmentType, "comm.CommitmentType()", comm.CommitmentType())
 	// If it's not the right commitment type, report it as an expired commitment in order to skip it
 	if d.cfg.CommitmentType != comm.CommitmentType() {
 		d.log.Debug("optimism/op-alt-da/damgr.go | GetInput | stopped, invalid commitment type", "d.cfg.commitmenttype", d.cfg.CommitmentType, "comm.CommitmentType()", comm.CommitmentType())
@@ -226,7 +217,6 @@ func (d *DA) GetInput(ctx context.Context, l1 L1Fetcher, comm CommitmentData, bl
 	data, err := d.storage.GetInput(ctx, comm)
 	notFound := errors.Is(ErrNotFound, err)
 	if err != nil && !notFound {
-		d.log.Debug("optimism/op-alt-da/damgr.go | GetInput | stopped, failed to get preimage", "comm", comm, "err", err)
 		d.log.Error("failed to get preimage", "err", err)
 		// the storage client request failed for some other reason
 		// in which case derivation pipeline should be retried
@@ -235,7 +225,6 @@ func (d *DA) GetInput(ctx context.Context, l1 L1Fetcher, comm CommitmentData, bl
 
 	// If the data is not found, things are handled differently based on the challenge status.
 	if notFound {
-		d.log.Debug("optimism/op-alt-da/damgr.go | GetInput | data notFound ", "comm", comm, "status", status, "blockId", blockId)
 		log.Warn("data not found for the given commitment", "comm", comm, "status", status, "block", blockId.Number)
 		switch status {
 		case ChallengeUninitialized:
@@ -280,13 +269,11 @@ func (d *DA) GetInput(ctx context.Context, l1 L1Fetcher, comm CommitmentData, bl
 		d.log.Debug("optimism/op-alt-da/damgr.go | GetInput | stopped, unknown challenge status", "comm", comm, "status", status, "blockId", blockId)
 		return nil, fmt.Errorf("unknown challenge status: %v", status)
 	}
-	d.log.Debug("optimism/op-alt-da/damgr.go | GetInput | finished", "comm", comm, "status", status, "blockId", blockId)
 	return data, nil
 }
 
 // AdvanceChallengeOrigin reads & stores challenge events for the given L1 block
 func (d *DA) AdvanceChallengeOrigin(ctx context.Context, l1 L1Fetcher, block eth.BlockID) error {
-	d.log.Debug("optimism/op-alt-da/damgr.go | AdvanceChallengeOrigin | started", "block", block)
 	// do not repeat for the same or old origin
 	if block.Number <= d.challengeOrigin.Number {
 		d.log.Debug("optimism/op-alt-da/damgr.go | AdvanceChallengeOrigin | stopped, block number is less than or equal to challenge origin number", "block", block, "d.challengeOrigin", d.challengeOrigin)
@@ -306,13 +293,11 @@ func (d *DA) AdvanceChallengeOrigin(ctx context.Context, l1 L1Fetcher, block eth
 	d.challengeOrigin = block
 	d.metrics.RecordChallengesHead("latest", d.challengeOrigin.Number)
 	d.log.Info("processed altDA challenge origin", "origin", block)
-	d.log.Debug("optimism/op-alt-da/damgr.go | AdvanceChallengeOrigin | finished", "block", block)
 	return nil
 }
 
 // AdvanceCommitmentOrigin updates the commitment origin and the finalized head.
 func (d *DA) AdvanceCommitmentOrigin(ctx context.Context, l1 L1Fetcher, block eth.BlockID) error {
-	d.log.Debug("optimism/op-alt-da/damgr.go | AdvanceCommitmentOrigin | ", "block", block)
 	// do not repeat for the same origin
 	if block.Number <= d.commitmentOrigin.Number {
 		d.log.Debug("optimism/op-alt-da/damgr.go | AdvanceCommitmentOrigin | stopped, block number is less than or equal to commitment origin number", "block", block, "d.commitmentOrigin", d.commitmentOrigin)
@@ -332,7 +317,6 @@ func (d *DA) AdvanceCommitmentOrigin(ctx context.Context, l1 L1Fetcher, block et
 	d.commitmentOrigin = block
 	d.metrics.RecordChallengesHead("latest", d.challengeOrigin.Number)
 	d.log.Info("processed altDA l1 origin", "origin", block, "finalized", d.finalizedHead.ID(), "l1-finalize", d.l1FinalizedHead.ID())
-	d.log.Debug("optimism/op-alt-da/damgr.go | AdvanceCommitmentOrigin | finished", "block", block)
 	return nil
 }
 
@@ -341,7 +325,6 @@ func (d *DA) AdvanceCommitmentOrigin(ctx context.Context, l1 L1Fetcher, block et
 // as the new head for tracking challenges and commitments. If forwards an error if any new challenge have expired to
 // trigger a derivation reset.
 func (d *DA) AdvanceL1Origin(ctx context.Context, l1 L1Fetcher, block eth.BlockID) error {
-	d.log.Debug("optimism/op-alt-da/damgr.go | AdvanceL1Origin | started", "block", block)
 	if err := d.AdvanceChallengeOrigin(ctx, l1, block); err != nil {
 		d.log.Debug("optimism/op-alt-da/damgr.go | AdvanceL1Origin | stopped, failed to advance challenge origin", "block", block, "err", err)
 		return fmt.Errorf("failed to advance challenge origin: %w", err)
@@ -353,20 +336,17 @@ func (d *DA) AdvanceL1Origin(ctx context.Context, l1 L1Fetcher, block eth.BlockI
 	// if there are no commitments, we can calculate the finalized head based on the challenge window
 	// otherwise, the finalization signal is used to set the finalized head
 	if d.state.NoCommitments() {
-		d.log.Debug("optimism/op-alt-da/damgr.go | AdvanceL1Origin | special case, no commitments")
 		if err := d.updateFinalizedFromL1(ctx, l1); err != nil {
 			d.log.Debug("optimism/op-alt-da/damgr.go | AdvanceL1Origin | special case stopped, failed to update finalized head", "block", block, "err", err)
 			return err
 		}
 		d.metrics.RecordChallengesHead("finalized", d.finalizedHead.Number)
 	}
-	d.log.Debug("optimism/op-alt-da/damgr.go | AdvanceL1Origin | finished", "block", block)
 	return nil
 }
 
 // loadChallengeEvents fetches the l1 block receipts and updates the challenge status
 func (d *DA) loadChallengeEvents(ctx context.Context, l1 L1Fetcher, block eth.BlockID) error {
-	d.log.Debug("optimism/op-alt-da/damgr.go | loadChallengeEvents | started", "block", block)
 	// filter any challenge event logs in the block
 	logs, err := d.fetchChallengeLogs(ctx, l1, block)
 	if err != nil {
@@ -384,7 +364,6 @@ func (d *DA) loadChallengeEvents(ctx context.Context, l1 L1Fetcher, block eth.Bl
 		}
 		switch status {
 		case ChallengeResolved:
-			d.log.Debug("optimism/op-alt-da/damgr.go | loadChallengeEvents | challenge resolved", "block", block, "txIdx", i)
 			// cached with input resolution call so not expensive
 			_, txs, err := l1.InfoAndTxsByHash(ctx, block.Hash)
 			if err != nil {
@@ -409,7 +388,6 @@ func (d *DA) loadChallengeEvents(ctx context.Context, l1 L1Fetcher, block eth.Bl
 
 			var input []byte
 			if d.cfg.CommitmentType == Keccak256CommitmentType {
-				d.log.Debug("optimism/op-alt-da/damgr.go | loadChallengeEvents | decoding resolved input (only for Keccak)", "block", block, "txIdx", i)
 				// Decode the input from resolver tx calldata
 				input, err = DecodeResolvedInput(tx.Data())
 				if err != nil {
@@ -430,12 +408,10 @@ func (d *DA) loadChallengeEvents(ctx context.Context, l1 L1Fetcher, block eth.Bl
 				continue
 			}
 		case ChallengeActive:
-			d.log.Debug("optimism/op-alt-da/damgr.go | loadChallengeEvents | challenge active", "block", block, "txIdx", i)
 			// create challenge in state
 			d.log.Info("detected new active challenge", "block", block, "comm", comm)
 			d.state.CreateChallenge(comm, block, bn)
 		default:
-			d.log.Debug("optimism/op-alt-da/damgr.go | loadChallengeEvents | unknown challenge status", "block", block, "txIdx", i, "log", log.Index, "status", status, "comm", comm)
 			d.log.Warn("skipping unknown challenge status", "block", block.Number, "tx", i, "log", log.Index, "status", status, "comm", comm)
 		}
 	}
@@ -444,7 +420,6 @@ func (d *DA) loadChallengeEvents(ctx context.Context, l1 L1Fetcher, block eth.Bl
 
 // fetchChallengeLogs returns logs for challenge events if any for the given block
 func (d *DA) fetchChallengeLogs(ctx context.Context, l1 L1Fetcher, block eth.BlockID) ([]*types.Log, error) {
-	d.log.Debug("optimism/op-alt-da/damgr.go | fetchChallengeLogs", "block", block)
 	var logs []*types.Log
 	// Don't look at the challenge contract if there is no challenge contract.
 	if d.cfg.CommitmentType == GenericCommitmentType {
@@ -468,13 +443,11 @@ func (d *DA) fetchChallengeLogs(ctx context.Context, l1 L1Fetcher, block eth.Blo
 			}
 		}
 	}
-	d.log.Debug("optimism/op-alt-da/damgr.go | fetchChallengeLogs | finished (should NOT happen for generic commitments)", "block", block, "numLogs", len(logs))
 	return logs, nil
 }
 
 // decodeChallengeStatus decodes and validates a challenge event from a transaction log, returning the associated commitment bytes.
 func (d *DA) decodeChallengeStatus(log *types.Log) (ChallengeStatus, CommitmentData, uint64, error) {
-	d.log.Debug("optimism/op-alt-da/damgr.go | decodeChallengeStatus | ", "log", log)
 	event, err := DecodeChallengeStatusEvent(log)
 	if err != nil {
 		d.log.Debug("optimism/op-alt-da/damgr.go | decodeChallengeStatus | stopped, failed to decode challenge status event", "log", log, "err", err)
@@ -485,8 +458,6 @@ func (d *DA) decodeChallengeStatus(log *types.Log) (ChallengeStatus, CommitmentD
 		d.log.Debug("optimism/op-alt-da/damgr.go | decodeChallengeStatus | stopped, failed to decode commitment data", "log", log, "event", event, "err", err)
 		return 0, nil, 0, err
 	}
-	d.log.Debug("optimism/op-alt-da/damgr.go | decodeChallengeStatus | decoded challenge status event", "log", log, "event", event)
-	d.log.Debug("decoded challenge status event", "log", log, "event", event, "comm", fmt.Sprintf("%x", comm.Encode()))
 	return ChallengeStatus(event.Status), comm, event.ChallengedBlockNumber.Uint64(), nil
 }
 
