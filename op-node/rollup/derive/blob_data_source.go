@@ -48,7 +48,6 @@ func NewBlobDataSource(ctx context.Context, log log.Logger, dsCfg DataSourceConf
 // ResetError if it cannot find the referenced block or a referenced blob, or TemporaryError for
 // any other failure to fetch a block or blob.
 func (ds *BlobDataSource) Next(ctx context.Context) (eth.Data, error) {
-	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | Next | started", "ds", ds)
 	if ds.data == nil {
 		var err error
 		if ds.data, err = ds.open(ctx); err != nil {
@@ -79,7 +78,6 @@ func (ds *BlobDataSource) Next(ctx context.Context) (eth.Data, error) {
 // transactions are found. It returns ResetError if it cannot find the referenced block or a
 // referenced blob, or TemporaryError for any other failure to fetch a block or blob.
 func (ds *BlobDataSource) open(ctx context.Context) ([]blobOrCalldata, error) {
-	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | started", "ref", ds.ref, "ds.ref.Hash", ds.ref.Hash)
 	_, txs, err := ds.fetcher.InfoAndTxsByHash(ctx, ds.ref.Hash)
 	if err != nil {
 		if errors.Is(err, ethereum.NotFound) {
@@ -116,7 +114,6 @@ func (ds *BlobDataSource) open(ctx context.Context) ([]blobOrCalldata, error) {
 		ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | stopped, failed to fill blob pointers", "err", err)
 		return nil, NewResetError(fmt.Errorf("failed to fill blob pointers: %w", err))
 	}
-	ds.log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | open | finished", "data", data)
 	return data, nil
 }
 
@@ -124,15 +121,12 @@ func (ds *BlobDataSource) open(ctx context.Context) ([]blobOrCalldata, error) {
 // creates a placeholder blobOrCalldata element for each returned blob hash that must be populated
 // by fillBlobPointers after blob bodies are retrieved.
 func dataAndHashesFromTxs(txs types.Transactions, config *DataSourceConfig, batcherAddr common.Address, log log.Logger) ([]blobOrCalldata, []eth.IndexedBlobHash) {
-	log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | started", "txs", txs, "config", config, "batcherAddr", batcherAddr)
 	data := []blobOrCalldata{}
 	var hashes []eth.IndexedBlobHash
 	blobIndex := 0 // index of each blob in the block's blob sidecar
 	for _, tx := range txs {
 		// skip any non-batcher transactions
-		log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | started for", "tx", tx)
 		if !isValidBatchTx(tx, config.l1Signer, config.batchInboxAddress, batcherAddr) {
-			log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | tx is not valid", "tx", tx)
 			blobIndex += len(tx.BlobHashes())
 			continue
 		}
@@ -157,9 +151,7 @@ func dataAndHashesFromTxs(txs types.Transactions, config *DataSourceConfig, batc
 			data = append(data, blobOrCalldata{nil, nil}) // will fill in blob pointers after we download them below
 			blobIndex += 1
 		}
-		log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | finished for", "tx", tx)
 	}
-	log.Debug("optimism/op-node/rollup/derive/blob_data_source.go | dataAndHashesFromTxs | finished", "data", data, "hashes", hashes)
 	return data, hashes
 }
 

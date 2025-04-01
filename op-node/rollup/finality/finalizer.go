@@ -135,7 +135,6 @@ func (ev TryFinalizeEvent) String() string {
 }
 
 func (fi *Finalizer) OnEvent(ev event.Event) bool {
-	fi.log.Debug("op-node/rollup/finality/finalizer.go | OnEvent | started", "ev", ev)
 	switch x := ev.(type) {
 	case FinalizeL1Event:
 		fi.onL1Finalized(x.FinalizedL1)

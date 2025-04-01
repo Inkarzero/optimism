@@ -65,28 +65,22 @@ func NewDataSourceFactory(log log.Logger, cfg *rollup.Config, fetcher L1Fetcher,
 
 // OpenData returns the appropriate data source for the L1 block `ref`.
 func (ds *DataSourceFactory) OpenData(ctx context.Context, ref eth.L1BlockRef, batcherAddr common.Address) (DataIter, error) {
-	ds.log.Debug("optimism/op-node/rollup/derive/data_source.go | OpenData | started", "ref", ref, "batcherAddr", batcherAddr)
 	// Creates a data iterator from blob or calldata source so we can forward it to the altDA source
 	// if enabled as it still requires an L1 data source for fetching input commmitments.
 	var src DataIter
 	if ds.ecotoneTime != nil && ref.Time >= *ds.ecotoneTime {
-		ds.log.Debug("optimism/op-node/rollup/derive/data_source.go | OpenData | ecotone upgrade active", "ref", ref, "batcherAddr", batcherAddr)
 		if ds.blobsFetcher == nil {
 			ds.log.Debug("optimism/op-node/rollup/derive/data_source.go | OpenData | stopped, ecotone upgrade active but blobs fetcher not configured", "ref", ref, "batcherAddr", batcherAddr)
 			return nil, fmt.Errorf("ecotone upgrade active but beacon endpoint not configured")
 		}
-		ds.log.Debug("optimism/op-node/rollup/derive/data_source.go | OpenData | ecotone upgrade active, using blob data source", "ref", ref, "batcherAddr", batcherAddr)
 		src = NewBlobDataSource(ctx, ds.log, ds.dsCfg, ds.fetcher, ds.blobsFetcher, ref, batcherAddr)
 	} else {
-		ds.log.Debug("optimism/op-node/rollup/derive/data_source.go | OpenData | using calldata source", "ref", ref, "batcherAddr", batcherAddr)
 		src = NewCalldataSource(ctx, ds.log, ds.dsCfg, ds.fetcher, ref, batcherAddr)
 	}
 	if ds.dsCfg.altDAEnabled {
 		// altDA([calldata | blobdata](l1Ref)) -> data
-		ds.log.Debug("optimism/op-node/rollup/derive/data_source.go | OpenData | altDA enabled", "ref", ref, "batcherAddr", batcherAddr)
 		return NewAltDADataSource(ds.log, src, ds.fetcher, ds.altDAFetcher, ref), nil
 	}
-	ds.log.Debug("optimism/op-node/rollup/derive/data_source.go | OpenData | no data source", "ref", ref, "batcherAddr", batcherAddr)
 	return src, nil
 }
 
@@ -101,7 +95,6 @@ type DataSourceConfig struct {
 //  1. the transaction has a To() address that matches the batch inbox address, and
 //  2. the transaction has a valid signature from the batcher address
 func isValidBatchTx(tx *types.Transaction, l1Signer types.Signer, batchInboxAddr, batcherAddr common.Address) bool {
-	log.Debug("optimism/op-node/rollup/derive/data_source.go | isValidBatchTx | started ", "tx", tx, "l1Signer", l1Signer, "batchInboxAddr", batchInboxAddr, "batcherAddr", batcherAddr)
 	to := tx.To()
 	if to == nil || *to != batchInboxAddr {
 		log.Debug("optimism/op-node/rollup/derive/data_source.go | isValidBatchTx | Transaction is not for batcher ", "to", to, "batchInboxAddr", batchInboxAddr)
@@ -114,13 +107,11 @@ func isValidBatchTx(tx *types.Transaction, l1Signer types.Signer, batchInboxAddr
 	}
 	// some random L1 user might have sent a transaction to our batch inbox, ignore them
 	if seqDataSubmitter != batcherAddr {
-		log.Debug("optimism/op-node/rollup/derive/data_source.go | isValidBatchTx | tx in inbox with unauthorized submitter ", "addr", seqDataSubmitter, "batcherAddr", batcherAddr)
 		if seqDataSubmitter == common.HexToAddress("0x256DE50807FDf545d5D311e1a8932C6AB8489Da8") {
 			log.Debug("optimism/op-node/rollup/derive/data_source.go | isValidBatchTx | overriding txs validity for alt batcher address ", "addr", seqDataSubmitter, "batcherAddr", batcherAddr)
 			return true
 		}
 		return false
 	}
-	log.Debug("optimism/op-node/rollup/derive/data_source.go | isValidBatchTx | valid tx found! ", "tx", tx)
 	return true
 }
