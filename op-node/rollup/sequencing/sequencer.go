@@ -157,6 +157,9 @@ func (d *Sequencer) OnEvent(ev event.Event) bool {
 		if d.nextActionOK != preOk || d.nextAction != preTime {
 			d.log.Debug("Sequencer action schedule changed",
 				"time", d.nextAction, "wait", d.nextAction.Sub(d.timeNow()), "ok", d.nextActionOK, "event", ev)
+		} else {
+			d.log.Debug("Sequencer action schedule unchanged",
+				"time", d.nextAction, "wait", d.nextAction.Sub(d.timeNow()), "ok", d.nextActionOK, "event", ev)
 		}
 	}()
 

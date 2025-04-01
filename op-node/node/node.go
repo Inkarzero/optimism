@@ -530,10 +530,6 @@ func (n *OpNode) OnNewL1Finalized(ctx context.Context, sig eth.L1BlockRef) {
 }
 
 func (n *OpNode) PublishL2Payload(ctx context.Context, envelope *eth.ExecutionPayloadEnvelope) error {
-	//skip publishing to p2p for now
-	n.log.Debug("/op-node/node/node.go | PublishL2Payload | skipping publishing to p2p for now", "envelope", envelope)
-	return nil
-
 	n.tracer.OnPublishL2Payload(ctx, envelope)
 
 	// publish to p2p, if we are running p2p at all

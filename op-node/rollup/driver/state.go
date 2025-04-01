@@ -201,6 +201,7 @@ func (s *Driver) eventLoop() {
 
 	for {
 		if s.driverCtx.Err() != nil { // don't try to schedule/handle more work when we are closing.
+			s.log.Debug("/op-node/rollup/driver/state.go | eventLoop | driverCtx.Err() != nil", "driverCtx.Err()", s.driverCtx.Err())
 			return
 		}
 
@@ -209,8 +210,10 @@ func (s *Driver) eventLoop() {
 			// (i.e. process all queued-up events) before creating any new events.
 			if err := s.drain(); err != nil {
 				if s.driverCtx.Err() != nil {
+					s.log.Debug("/op-node/rollup/driver/state.go | eventLoop | drain | driverCtx.Err() != nil", "driverCtx.Err()", s.driverCtx.Err())
 					return
 				}
+				s.log.Debug("/op-node/rollup/driver/state.go | eventLoop | drain | unexpected error", "err", err)
 				s.log.Error("unexpected error from event-draining", "err", err)
 			}
 		}
@@ -277,6 +280,7 @@ func (s *Driver) eventLoop() {
 			s.metrics.RecordPipelineReset()
 			close(respCh)
 		case <-s.driverCtx.Done():
+			s.log.Debug("/op-node/rollup/driver/state.go | eventLoop | driverCtx.Done()", "driverCtx.Err()", s.driverCtx.Err(), "driverCtx", s.driverCtx)
 			return
 		}
 	}
