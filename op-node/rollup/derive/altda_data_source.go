@@ -33,7 +33,6 @@ func NewAltDADataSource(log log.Logger, src DataIter, l1 L1Fetcher, fetcher AltD
 }
 
 func (s *AltDADataSource) Next(ctx context.Context) (eth.Data, error) {
-	s.log.Debug("optimism/op-node/rollup/derive/altda_data_source.go | Next | started", "comm", s.comm)
 	// Process origin syncs the challenge contract events and updates the local challenge states
 	// before we can proceed to fetch the input data. This function can be called multiple times
 	// for the same origin and noop if the origin was already processed. It is also called if
@@ -46,7 +45,6 @@ func (s *AltDADataSource) Next(ctx context.Context) (eth.Data, error) {
 		s.log.Debug("optimism/op-node/rollup/derive/altda_data_source.go | Next | stopped, err in advanceL1Origin", "err", err)
 		return nil, NewTemporaryError(fmt.Errorf("failed to advance altDA L1 origin: %w", err))
 	}
-	s.log.Debug("optimism/op-node/rollup/derive/altda_data_source.go | Next | no error in advanceL1Origin")
 	if s.comm == nil {
 		// the l1 source returns the input commitment for the batch.
 		data, err := s.src.Next(ctx)
@@ -68,13 +66,11 @@ func (s *AltDADataSource) Next(ctx context.Context) (eth.Data, error) {
 		// strip the transaction data version byte from the data before decoding.
 		comm, err := altda.DecodeCommitmentData(data[1:])
 		if err != nil {
-			s.log.Debug("optimism/op-node/rollup/derive/altda_data_source.go | Next | stopped, err in DecodeCommitmentData", "err", err)
 			s.log.Warn("invalid commitment", "commitment", data, "err", err)
 			return nil, NotEnoughData
 		}
 		s.comm = comm
 	}
-	s.log.Debug("optimism/op-node/rollup/derive/altda_data_source.go | Next | commitment is valid", "comm", s.comm)
 	// use the commitment to fetch the input from the AltDA provider.
 	data, err := s.fetcher.GetInput(ctx, s.l1, s.comm, s.id)
 	// GetInput may call for a reorg if the pipeline is stalled and the AltDA manager
@@ -104,12 +100,10 @@ func (s *AltDADataSource) Next(ctx context.Context) (eth.Data, error) {
 	}
 	// inputs are limited to a max size to ensure they can be challenged in the DA contract.
 	if s.comm.CommitmentType() == altda.Keccak256CommitmentType && len(data) > altda.MaxInputSize {
-		s.log.Debug("optimism/op-node/rollup/derive/altda_data_source.go | Next | input max size exceeded (should NOT happen for generic commitment type)")
 		s.log.Warn("input data exceeds max size", "size", len(data), "max", altda.MaxInputSize)
 		s.comm = nil
 		return s.Next(ctx)
 	}
-	s.log.Debug("optimism/op-node/rollup/derive/altda_data_source.go | Next | finished", "s.comm", s.comm, "data", data)
 	// reset the commitment so we can fetch the next one from the source at the next iteration.
 	s.comm = nil
 	return data, nil

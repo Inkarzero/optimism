@@ -97,7 +97,6 @@ type DataSourceConfig struct {
 func isValidBatchTx(tx *types.Transaction, l1Signer types.Signer, batchInboxAddr, batcherAddr common.Address) bool {
 	to := tx.To()
 	if to == nil || *to != batchInboxAddr {
-		log.Debug("optimism/op-node/rollup/derive/data_source.go | isValidBatchTx | Transaction is not for batcher ", "to", to, "batchInboxAddr", batchInboxAddr)
 		return false
 	}
 	seqDataSubmitter, err := l1Signer.Sender(tx) // optimization: only derive sender if To is correct

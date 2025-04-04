@@ -423,7 +423,6 @@ func (d *DA) fetchChallengeLogs(ctx context.Context, l1 L1Fetcher, block eth.Blo
 	var logs []*types.Log
 	// Don't look at the challenge contract if there is no challenge contract.
 	if d.cfg.CommitmentType == GenericCommitmentType {
-		d.log.Debug("optimism/op-alt-da/damgr.go | fetchChallengeLogs | stopped, not for generic commitments", "block", block)
 		return logs, nil
 	}
 	//cached with deposits events call so not expensive
