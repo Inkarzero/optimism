@@ -178,6 +178,7 @@ func (d *EngDeriver) OnEvent(ev event.Event) bool {
 			if errors.Is(err, derive.ErrReset) {
 				d.emitter.Emit(rollup.ResetEvent{Err: err})
 			} else if errors.Is(err, derive.ErrTemporary) {
+				d.log.Debug("/op-node/rollup/engine/events.go | OnEvent | emitting EngineTemporaryErrorEvent v1", "err", err)
 				d.emitter.Emit(rollup.EngineTemporaryErrorEvent{Err: err})
 			} else {
 				d.emitter.Emit(rollup.CriticalErrorEvent{Err: fmt.Errorf("unexpected TryBackupUnsafeReorg error type: %w", err)})
@@ -190,6 +191,7 @@ func (d *EngDeriver) OnEvent(ev event.Event) bool {
 			if errors.Is(err, derive.ErrReset) {
 				d.emitter.Emit(rollup.ResetEvent{Err: err})
 			} else if errors.Is(err, derive.ErrTemporary) {
+				d.log.Debug("/op-node/rollup/engine/events.go | OnEvent | emitting EngineTemporaryErrorEvent v2", "err", err)
 				d.emitter.Emit(rollup.EngineTemporaryErrorEvent{Err: err})
 			} else {
 				d.emitter.Emit(rollup.CriticalErrorEvent{Err: fmt.Errorf("unexpected TryUpdateEngine error type: %w", err)})
@@ -211,6 +213,7 @@ func (d *EngDeriver) OnEvent(ev event.Event) bool {
 			if errors.Is(err, derive.ErrReset) {
 				d.emitter.Emit(rollup.ResetEvent{Err: err})
 			} else if errors.Is(err, derive.ErrTemporary) {
+				d.log.Debug("/op-node/rollup/engine/events.go | OnEvent | emitting EngineTemporaryErrorEvent v3", "err", err)
 				d.emitter.Emit(rollup.EngineTemporaryErrorEvent{Err: err})
 			} else {
 				d.emitter.Emit(rollup.CriticalErrorEvent{Err: fmt.Errorf("unexpected InsertUnsafePayload error type: %w", err)})

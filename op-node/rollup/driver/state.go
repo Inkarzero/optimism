@@ -351,6 +351,7 @@ func (s *SyncDeriver) OnEvent(ev event.Event) bool {
 		s.Log.Warn("L1 temporary error", "err", x.Err)
 		s.Emitter.Emit(StepReqEvent{})
 	case rollup.EngineTemporaryErrorEvent:
+		s.Log.Debug("/op-node/rollup/driver/state.go | OnEvent | EngineTemporaryErrorEvent", "err", x.Err)
 		s.Log.Warn("Engine temporary error", "err", x.Err)
 		// Make sure that for any temporarily failed attributes we retry processing.
 		// This will be triggered by a step. After appropriate backoff.

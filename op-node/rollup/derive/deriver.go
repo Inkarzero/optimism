@@ -110,6 +110,7 @@ func (d *PipelineDeriver) OnEvent(ev event.Event) bool {
 		} else if err != nil && errors.Is(err, ErrReset) {
 			d.emitter.Emit(rollup.ResetEvent{Err: err})
 		} else if err != nil && errors.Is(err, ErrTemporary) {
+			d.pipeline.log.Debug("/op-node/rollup/derive/deriver.go | OnEvent | emitting EngineTemporaryErrorEvent v1", "err", err)
 			d.emitter.Emit(rollup.EngineTemporaryErrorEvent{Err: err})
 		} else if err != nil && errors.Is(err, ErrCritical) {
 			d.emitter.Emit(rollup.CriticalErrorEvent{Err: err})
@@ -118,6 +119,7 @@ func (d *PipelineDeriver) OnEvent(ev event.Event) bool {
 			d.emitter.Emit(DeriverMoreEvent{})
 		} else if err != nil {
 			d.pipeline.log.Error("Derivation process error", "err", err)
+			d.pipeline.log.Debug("/op-node/rollup/derive/deriver.go | OnEvent | emitting EngineTemporaryErrorEvent v2", "err", err)
 			d.emitter.Emit(rollup.EngineTemporaryErrorEvent{Err: err})
 		} else {
 			if attrib != nil {

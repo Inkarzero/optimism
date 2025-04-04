@@ -73,6 +73,7 @@ func (d *ProgramDeriver) OnEvent(ev event.Event) bool {
 		d.closing = true
 		d.result = fmt.Errorf("unexpected L1 error: %w", x.Err)
 	case rollup.EngineTemporaryErrorEvent:
+		d.logger.Debug("/op-node/rollup/driver/program.go | OnEvent | EngineTemporaryErrorEvent", "err", x.Err)
 		// (Legacy case): While most temporary errors are due to requests for external data failing which can't happen,
 		// they may also be returned due to other events like channels timing out so need to be handled
 		d.logger.Warn("Temporary error in derivation", "err", x.Err)

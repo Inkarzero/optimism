@@ -45,6 +45,7 @@ func (eq *EngDeriver) onBuildStart(ev BuildStartEvent) {
 		switch errTyp {
 		case BlockInsertTemporaryErr:
 			// RPC errors are recoverable, we can retry the buffered payload attributes later.
+			eq.log.Debug("/op-node/rollup/engine/build_start.go | onBuildStart | emitting EngineTemporaryErrorEvent", "err", err)
 			eq.emitter.Emit(rollup.EngineTemporaryErrorEvent{Err: fmt.Errorf("temporarily cannot insert new safe block: %w", err)})
 			return
 		case BlockInsertPrestateErr:

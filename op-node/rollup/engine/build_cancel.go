@@ -28,6 +28,7 @@ func (eq *EngDeriver) onBuildCancel(ev BuildCancelEvent) {
 		}
 		eq.log.Error("failed to cancel block building job", "info", ev.Info, "err", err)
 		if !ev.Force {
+			eq.log.Debug("/op-node/rollup/engine/build_cancel.go | onBuildCancel | emitting EngineTemporaryErrorEvent", "err", err)
 			eq.emitter.Emit(rollup.EngineTemporaryErrorEvent{Err: err})
 		}
 	}

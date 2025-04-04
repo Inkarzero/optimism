@@ -69,6 +69,7 @@ func (eq *AttributesHandler) OnEvent(ev event.Event) bool {
 		eq.sentAttributes = false
 		eq.attributes = nil
 	case rollup.EngineTemporaryErrorEvent:
+		eq.log.Debug("/op-node/rollup/attributes/attributes.go | OnEvent | EngineTemporaryErrorEvent", "err", x.Err)
 		eq.sentAttributes = false
 	case engine.InvalidPayloadAttributesEvent:
 		if x.Attributes.DerivedFrom == (eth.L1BlockRef{}) {
@@ -174,6 +175,7 @@ func (eq *AttributesHandler) consolidateNextSafeAttributes(attributes *derive.At
 			eq.emitter.Emit(rollup.ResetEvent{Err: fmt.Errorf("expected engine was synced and had unsafe block to reconcile, but cannot find the block: %w", err)})
 			return
 		}
+		eq.log.Debug("/op-node/rollup/attributes/attributes.go | consolidateNextSafeAttributes | emitting EngineTemporaryErrorEvent", "err", err)
 		eq.emitter.Emit(rollup.EngineTemporaryErrorEvent{Err: fmt.Errorf("failed to get existing unsafe payload to compare against derived attributes from L1: %w", err)})
 		return
 	}

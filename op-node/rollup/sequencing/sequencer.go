@@ -181,6 +181,7 @@ func (d *Sequencer) OnEvent(ev event.Event) bool {
 	case SequencerActionEvent:
 		d.onSequencerAction(x)
 	case rollup.EngineTemporaryErrorEvent:
+		d.log.Debug("/op-node/rollup/sequencing/sequencer.go | OnEvent | EngineTemporaryErrorEvent", "err", x.Err)
 		d.onEngineTemporaryError(x)
 	case rollup.ResetEvent:
 		d.onReset(x)
@@ -269,6 +270,7 @@ func (d *Sequencer) onBuildSealed(x engine.BuildSealedEvent) {
 	ctx, cancel := context.WithTimeout(d.ctx, time.Second*30)
 	defer cancel()
 	if err := d.conductor.CommitUnsafePayload(ctx, x.Envelope); err != nil {
+		d.log.Debug("/op-node/rollup/sequencing/sequencer.go | onBuildSealed | emitting EngineTemporaryErrorEvent", "err", err)
 		d.emitter.Emit(rollup.EngineTemporaryErrorEvent{
 			Err: fmt.Errorf("failed to commit unsafe payload to conductor: %w", err)})
 		return
@@ -498,6 +500,7 @@ func (d *Sequencer) startBuildingBlock() {
 	attrs, err := d.attrBuilder.PreparePayloadAttributes(fetchCtx, l2Head, l1Origin.ID())
 	if err != nil {
 		if errors.Is(err, derive.ErrTemporary) {
+			d.log.Debug("/op-node/rollup/sequencing/sequencer.go | startBuildingBlock | emitting EngineTemporaryErrorEvent", "err", err)
 			d.emitter.Emit(rollup.EngineTemporaryErrorEvent{Err: err})
 			return
 		} else if errors.Is(err, derive.ErrReset) {

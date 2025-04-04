@@ -321,6 +321,7 @@ func (s *L2Verifier) OnEvent(ev event.Event) bool {
 	case rollup.L1TemporaryErrorEvent:
 		s.log.Warn("L1 temporary error", "err", x.Err)
 	case rollup.EngineTemporaryErrorEvent:
+		s.log.Debug("/op-e2e/actions/l2_verifier.go | OnEvent() | EngineTemporaryErrorEvent", "err", x.Err)
 		s.log.Warn("Engine temporary error", "err", x.Err)
 		if errors.Is(x.Err, sync.WrongChainErr) { // action-tests don't back off on temporary errors. Avoid a bad genesis setup from looping.
 			panic(fmt.Errorf("genesis setup issue: %w", x.Err))
